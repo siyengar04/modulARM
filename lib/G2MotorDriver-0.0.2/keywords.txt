@@ -1,0 +1,12 @@
+G2MotorDriver	KEYWORD1
+
+init	KEYWORD2
+setSpeed	KEYWORD2
+setBrake	KEYWORD2
+getCurrentMilliamps	KEYWORD2
+getCurrentReading	KEYWORD2
+calibrateCurrentOffset	KEYWORD2
+getFault	KEYWORD2
+flip	KEYWORD2
+Sleep	KEYWORD2
+Wake	KEYWORD2
