@@ -131,24 +131,24 @@ void processSerialCommands()
     char cmd = Serial.read();
 
     if (cmd == 'p')
-    { 
+    { // Position control mode
       float pos = Serial.parseFloat();
       if (pos != 0 || Serial.peek() == '\n')
       {
         targetPosition = pos;
         positionControlMode = true;
-        setpoint = targetPosition;
+        Setpoint = targetPosition;
         Serial.print("Position mode - Target: ");
         Serial.print(targetPosition);
         Serial.println(" degrees");
       }
     }
     else if (cmd == 's')
-    {
+    { // Speed control mode
       float speed = Serial.parseFloat();
       if (speed != 0 || Serial.peek() == '\n')
       {
-        targetSpeed = speed * 6.0;
+        targetSpeed = speed * 6.0; // Convert RPM to degrees/sec (360 deg/rev * RPM/60)
         positionControlMode = false;
         setpoint = targetSpeed;
         Serial.print("Speed mode - Target: ");

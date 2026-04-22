@@ -124,67 +124,6 @@ void updatePID()
 
   md.setSpeed(constrain(output, -400, 400));
 }
-void processSerialCommands()
-{
-  if (Serial.available())
-  {
-    char cmd = Serial.read();
-
-    if (cmd == 'p')
-    { 
-      float pos = Serial.parseFloat();
-      if (pos != 0 || Serial.peek() == '\n')
-      {
-        targetPosition = pos;
-        positionControlMode = true;
-        setpoint = targetPosition;
-        Serial.print("Position mode - Target: ");
-        Serial.print(targetPosition);
-        Serial.println(" degrees");
-      }
-    }
-    else if (cmd == 's')
-    {
-      float speed = Serial.parseFloat();
-      if (speed != 0 || Serial.peek() == '\n')
-      {
-        targetSpeed = speed * 6.0;
-        positionControlMode = false;
-        setpoint = targetSpeed;
-        Serial.print("Speed mode - Target: ");
-        Serial.print(targetSpeed);
-        Serial.println(" deg/sec");
-      }
-    }
-    else if (cmd == 'k')
-    {
-      char param = Serial.read();
-      float value = Serial.parseFloat();
-
-      if (param == 'p')
-      {
-        Kp = value;
-        myPID.SetTunings(Kp, Ki, Kd);
-        Serial.print("Kp set to: ");
-        Serial.println(Kp);
-      }
-      else if (param == 'i')
-      {
-        Ki = value;
-        myPID.SetTunings(Kp, Ki, Kd);
-        Serial.print("Ki set to: ");
-        Serial.println(Ki);
-      }
-      else if (param == 'd')
-      {
-        Kd = value;
-        myPID.SetTunings(Kp, Ki, Kd);
-        Serial.print("Kd set to: ");
-        Serial.println(Kd);
-      }
-    }
-  }
-}
 
 void loop()
 {
@@ -200,17 +139,17 @@ void loop()
     static unsigned long lastDebugTime = 0;
     if (currentTime - lastDebugTime >= 100)
     {
-      Serial.print("mode: ");
+      Serial.print("Mode: ");
       Serial.print(positionControlMode ? "POS" : "SPD");
-      Serial.print(" | setpoint: ");
-      Serial.print(setpoint);
-      Serial.print(" | input: ");
-      Serial.print(input);
-      Serial.print(" | output: ");
-      Serial.print(output);
-      Serial.print(" | position: ");
+      Serial.print(" | Setpoint: ");
+      Serial.print(Setpoint);
+      Serial.print(" | Input: ");
+      Serial.print(Input);
+      Serial.print(" | Output: ");
+      Serial.print(Output);
+      Serial.print(" | Position: ");
       Serial.print(encoderAngle);
-      Serial.print("° | speed: ");
+      Serial.print("° | Speed: ");
       Serial.print(currentSpeed);
       Serial.println("°/s");
       lastDebugTime = currentTime;

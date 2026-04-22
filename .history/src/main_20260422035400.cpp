@@ -110,8 +110,9 @@ void calcSpeed()
 void updatePID()
 {
   encoderAngle = (encoderPosition * 360.0) / 17280.0;
-  calcSpeed();
+  calculateSpeed();
 
+  // Set PID input based on control mode
   if (positionControlMode)
   {
     input = encoderAngle;
@@ -120,100 +121,38 @@ void updatePID()
   {
     input = currentSpeed;
   }
+
+  // Compute PID output
   myPID.Compute();
 
   md.setSpeed(constrain(output, -400, 400));
 }
-void processSerialCommands()
-{
-  if (Serial.available())
-  {
-    char cmd = Serial.read();
-
-    if (cmd == 'p')
-    { 
-      float pos = Serial.parseFloat();
-      if (pos != 0 || Serial.peek() == '\n')
-      {
-        targetPosition = pos;
-        positionControlMode = true;
-        setpoint = targetPosition;
-        Serial.print("Position mode - Target: ");
-        Serial.print(targetPosition);
-        Serial.println(" degrees");
-      }
-    }
-    else if (cmd == 's')
-    {
-      float speed = Serial.parseFloat();
-      if (speed != 0 || Serial.peek() == '\n')
-      {
-        targetSpeed = speed * 6.0;
-        positionControlMode = false;
-        setpoint = targetSpeed;
-        Serial.print("Speed mode - Target: ");
-        Serial.print(targetSpeed);
-        Serial.println(" deg/sec");
-      }
-    }
-    else if (cmd == 'k')
-    {
-      char param = Serial.read();
-      float value = Serial.parseFloat();
-
-      if (param == 'p')
-      {
-        Kp = value;
-        myPID.SetTunings(Kp, Ki, Kd);
-        Serial.print("Kp set to: ");
-        Serial.println(Kp);
-      }
-      else if (param == 'i')
-      {
-        Ki = value;
-        myPID.SetTunings(Kp, Ki, Kd);
-        Serial.print("Ki set to: ");
-        Serial.println(Ki);
-      }
-      else if (param == 'd')
-      {
-        Kd = value;
-        myPID.SetTunings(Kp, Ki, Kd);
-        Serial.print("Kd set to: ");
-        Serial.println(Kd);
-      }
-    }
-  }
-}
 
 void loop()
 {
-  unsigned long currentTime = millis();
-
+  md.setSpeed(50);
   // Serial.println(startTime);
-  if (currentTime - lastPIDTime >= pidInterval)
-  {
-    updatePID();
-    lastPIDTime = currentTime;
 
-    // Debug output every 100ms
-    static unsigned long lastDebugTime = 0;
-    if (currentTime - lastDebugTime >= 100)
-    {
-      Serial.print("mode: ");
-      Serial.print(positionControlMode ? "POS" : "SPD");
-      Serial.print(" | setpoint: ");
-      Serial.print(setpoint);
-      Serial.print(" | input: ");
-      Serial.print(input);
-      Serial.print(" | output: ");
-      Serial.print(output);
-      Serial.print(" | position: ");
-      Serial.print(encoderAngle);
-      Serial.print("° | speed: ");
-      Serial.print(currentSpeed);
-      Serial.println("°/s");
-      lastDebugTime = currentTime;
-    }
+  if (millis() - startTime > 1000)
+  {
+    encoderAngle = (((encoderPosition) * 360) / 17280);
+    Serial.println("Theta = ");
+    Serial.print(encoderAngle);
+    Serial.println(" deg");
+    encoderSpeed = (encoderAngle - previousAngle);
+    Serial.println("Theta_Dot = ");
+    Serial.print(encoderSpeed);
+    // currentTime = millis();
+    // timeWindow = (currentTime - startTime);
+    // Serial.println("");
+    // Serial.println(timeWindow);
+    previousAngle = encoderAngle;
+    startTime = millis();
   }
+
+  // while (millis() > 20) {
+  // }
+  // There is 4 pulses per step
+  // Encoder has 64 steps per revolution
+  // Gearbox ratio is 1:270
 }

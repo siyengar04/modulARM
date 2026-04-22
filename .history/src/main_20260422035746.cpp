@@ -131,20 +131,20 @@ void processSerialCommands()
     char cmd = Serial.read();
 
     if (cmd == 'p')
-    { 
+    { // Position control mode
       float pos = Serial.parseFloat();
       if (pos != 0 || Serial.peek() == '\n')
       {
         targetPosition = pos;
         positionControlMode = true;
-        setpoint = targetPosition;
+        Setpoint = targetPosition;
         Serial.print("Position mode - Target: ");
         Serial.print(targetPosition);
         Serial.println(" degrees");
       }
     }
     else if (cmd == 's')
-    {
+    { // Speed control mode
       float speed = Serial.parseFloat();
       if (speed != 0 || Serial.peek() == '\n')
       {

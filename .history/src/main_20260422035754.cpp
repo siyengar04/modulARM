@@ -137,7 +137,7 @@ void processSerialCommands()
       {
         targetPosition = pos;
         positionControlMode = true;
-        setpoint = targetPosition;
+        Setpoint = targetPosition;
         Serial.print("Position mode - Target: ");
         Serial.print(targetPosition);
         Serial.println(" degrees");
