@@ -1,292 +1,217 @@
 #include "G2MotorDriver.h"
-#include "PID_v1.h"
 
-#define encoderPinA 2
-#define encoderPinB 3
+// ===================== MOTOR DRIVER PINS =====================
+// IMPORTANT: Do NOT use default constructor, because default DIR pin = 2,
+// which conflicts with encoderPinA = 2.
+//
+// Wiring:
+// DIR  -> 7
+// PWM  -> 9   // Timer1, 20 kHz on Arduino Uno with this library
+// SLP  -> 4
+// FLT  -> 6
+// CS   -> A0
+const uint8_t MD_DIR = 7;
+const uint8_t MD_PWM = 11;
+const uint8_t MD_SLP = 4;
+const uint8_t MD_FLT = 6;
+const uint8_t MD_CS = A0;
 
-G2MotorDriver24v13 md(7, 9, 4, 6, 0); // DIRPin, PWMPin, SLPPin, FLTPin, CSPin
+// Limit switch pins 
+const uint8_t limitSwitchPin1 = 4;
+const uint8_t limitSwitchPin2 = 9;
 
-volatile int encoderPosition = 0;
-float previousAngle = 0.0;
-float encoderAngle = 0.0;
-float encoderSpeed = 0.0;
-float rpm = 0.0;
-float theta = 0.0; 
-float theta_dot = 0.0;
-int angle = 0;
+G2MotorDriver24v13 md(MD_DIR, MD_PWM, MD_SLP, MD_FLT, MD_CS);
 
-long startTime = 0;
-long currentTime = 0;
-long timeWindow = 0;
-int totalPulses = 0;
+// ===================== ENCODER PINS =====================
+const uint8_t encoderPinA = 2;
+const uint8_t encoderPinB = 3;
 
-double setpoint, input, output;
-// double Kp = 0.3, Ki = 0.75, Kd = 0.3;
-double Kp = 0.1, Ki = 0.3, Kd = 0.0;
+volatile long encoderCount = 0;
 
-PID myPID(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
-bool positionControlMode = true; 
-float targetPosition = 0.0;      
-float targetSpeed = 0.0;       
-unsigned long lastPIDTime = 0;
-unsigned long pidInterval = 5;
-float currentSpeed = 0.0;
-long lastSpeedTime = 0;
-int lastEncoderPosition = 0;
+// ===================== ENCODER CONSTANTS =====================
+// If 64 already means quadrature counts per motor rev, keep 64.
+// If 64 means pulses per channel per motor rev, use 64*4 = 256.
+const float gearRatio = 270.0;
+const float countsPerMotorRev = 64.0;
+const float countsPerOutputRev = gearRatio * countsPerMotorRev;
 
-// Hard angle limits
-float minAngle = -90.0;  // Minimum angle in degrees
-float maxAngle = 90.0;   // Maximum angle in degrees
-bool angleLimitsEnabled = false;
+// ===================== CONTROL TIMING =====================
+const unsigned long controlPeriodMicros = 2000; // mus = 500 Hz
+unsigned long lastControlMicros = 0;
 
+// ===================== PID GAINS =====================
+float Kp = 500.0;
+float Ki = 300.0;
+float Kd = 2.0;
+
+// ===================== SETPOINT =====================
+float theta_des = PI; // rad
+
+// ===================== PID STATES =====================
+float e_int = 0.0;
+float e_prev = 0.0;
+
+// Integral anti-windup limit
+const float eIntMax = 50.0;
+
+// ===================== MEASURED STATES =====================
+float theta_meas = 0.0;
+float omega_meas = 0.0;
+
+long prevCount = 0;
+
+// ===================== SERIAL PRINTING =====================
+int printCounter = 0;
+const int printEvery = 30; // print every 30 control loops = 500 Hz
+
+// ===================== ENCODER ISR =====================
 void doEncoderA()
 {
-  if (digitalRead(encoderPinA) == HIGH)
-  {
-    if (digitalRead(encoderPinB) == LOW)
-      encoderPosition++;  // CW
-    else
-      encoderPosition--;  // CCW
-  }
+  bool A = digitalRead(encoderPinA);
+  bool B = digitalRead(encoderPinB);
+
+  if (A == B)
+    encoderCount++;
   else
-  {
-    if (digitalRead(encoderPinB) == HIGH)
-      encoderPosition++;  // CW
-    else
-      encoderPosition--;  // CCW
-  }
+    encoderCount--;
 }
+
 void doEncoderB()
 {
-  if (digitalRead(encoderPinB) == HIGH)
-  {
-    if (digitalRead(encoderPinA) == HIGH)
-      encoderPosition++;  // CW
-    else
-      encoderPosition--;  // CCW
-  }
+  bool A = digitalRead(encoderPinA);
+  bool B = digitalRead(encoderPinB);
+
+  if (A == B)
+    encoderCount--;
   else
+    encoderCount++;
+}
+
+// ===================== FAULT CHECK =====================
+void stopIfFault()
+{
+  if (md.getFault())
   {
-    if (digitalRead(encoderPinA) == LOW)
-      encoderPosition++;  // CW
-    else
-      encoderPosition--;  // CCW
+    md.setSpeed(0);
+    md.Sleep();
+
+    Serial.println("Motor driver fault detected. Driver disabled.");
+
+    while (1)
+    {
+      delay(100);
+    }
   }
 }
 
+// ===================== MOTOR COMMAND =====================
+void setMotorCommand(float u)
+{
+  int u_cmd = (int)constrain(u, -400.0, 400.0);
+  md.setSpeed(u_cmd);
+}
+
+// ===================== READ ENCODER =====================
+void readEncoderState(float dt)
+{
+  long count;
+
+  noInterrupts();
+  count = encoderCount;
+  interrupts();
+
+  theta_meas = count * 2.0 * PI / countsPerOutputRev;
+
+  long dCount = count - prevCount;
+  omega_meas = dCount * 2.0 * PI / (countsPerOutputRev * dt);
+
+  prevCount = count;
+}
+
+// ===================== SETUP =====================
 void setup()
 {
   Serial.begin(115200);
 
-  // Motor driver
+  pinMode(encoderPinA, INPUT_PULLUP);
+  pinMode(encoderPinB, INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(encoderPinA), doEncoderA, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(encoderPinB), doEncoderB, CHANGE);
+
   md.init();
+  // Keep motor driver disabled during startup
+  md.Sleep();
+  delay(10);
+  // Force command to zero before enabling the driver
+  md.setSpeed(0);
+  delay(10);
+  // Now enable the driver
   md.Wake();
+  delay(10);
+  // Calibrate current sensor at zero command
   md.calibrateCurrentOffset();
   delay(10);
-  // md.Sleep();
 
-  pinMode(encoderPinA, INPUT);
-  pinMode(encoderPinB, INPUT);
-  attachInterrupt(digitalPinToInterrupt(2), doEncoderA, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(3), doEncoderB, CHANGE);
+  lastControlMicros = micros();
 
-  myPID.SetMode(AUTOMATIC);
-  myPID.SetOutputLimits(-300, 300);
-  myPID.SetSampleTime(pidInterval);
-
-  // Initialize setpoint to current position
-  setpoint = 0.0;
-
-  lastPIDTime = millis();
-  lastSpeedTime = millis();
-  lastEncoderPosition = encoderPosition;
-
-  Serial.println("setup complete!");
-}
-void calcSpeed()
-{
-  unsigned long currentTime = millis();
-  unsigned long dt = currentTime - lastSpeedTime;
-
-  if (dt >= 10)  // Calculate speed every 10ms for PID input freshness
-  {
-    long deltaPulses = encoderPosition - lastEncoderPosition;
-    float deltaAngle = (deltaPulses * 360.0) / 17280.0; 
-    currentSpeed = (deltaAngle * 1000.0) / dt; 
-    lastEncoderPosition = encoderPosition;
-    lastSpeedTime = currentTime;
-  }
-}
-void updatePID()
-{
-  encoderAngle = fmod((encoderPosition * 360.0) / 17280.0 + 360.0, 360.0);
-  calcSpeed();
-
-  if (positionControlMode)
-  {
-    input = encoderAngle;
-    
-    // Calculate signed error with wrap-around
-    float error = setpoint - input;
-    if (error > 180) error -= 360;
-    if (error < -180) error += 360;
-    
-    // Check if close enough to target (within 2 degrees)
-    if (abs(error) < 5.0)
-    {
-      output = 0;  // Stop output when settled
-      // md.setSpeed(0);
-    }
-    else
-    {
-      myPID.Compute();
-    }
-  }
-  else
-  {
-    input = currentSpeed;
-    myPID.Compute();
-  }
-
-  // Apply hard angle limits using direction pin logic
-  int finalSpeed = constrain(output, -400, 400);
-  
-  if (angleLimitsEnabled)
-  {
-    // Enforce hard angle limits
-    if (encoderAngle <= minAngle && finalSpeed < 0)
-    {
-      // At minimum angle, prevent counterclockwise motion
-      finalSpeed = 0;
-    }
-    else if (encoderAngle >= maxAngle && finalSpeed > 0)
-    {
-      // At maximum angle, prevent clockwise motion
-      finalSpeed = 0;
-    }
-  }
-
-  md.setSpeed(finalSpeed);
-}
-void processSerialCommands()
-{
-  if (Serial.available())
-  {
-    char cmd = Serial.read();
-
-    if (cmd == 'p')
-    { 
-      float pos = Serial.parseFloat();
-      targetPosition = pos;
-      positionControlMode = true;
-      setpoint = targetPosition;
-      Serial.print("Position mode - Target: ");
-      Serial.print(targetPosition);
-      Serial.println(" degrees");
-      while (Serial.available() && Serial.peek() != '\n') Serial.read();  // Clear buffer
-    }
-    else if (cmd == 's')
-    {
-      float speed = Serial.parseFloat();
-      targetSpeed = speed * (244.44/400.0); // deg / sec
-      positionControlMode = false;
-      setpoint = targetSpeed * (400.0/244.44);
-      Serial.print("Speed mode - Target: ");
-      Serial.print(targetSpeed);
-      Serial.println(" deg/sec");
-      while (Serial.available() && Serial.peek() != '\n') Serial.read();  // Clear buffer
-    }
-    else if (cmd == 'k')
-    {
-      char param = Serial.read();
-      float value = Serial.parseFloat();
-
-      if (param == 'p')
-      {
-        Kp = value;
-        myPID.SetTunings(Kp, Ki, Kd);
-        Serial.print("Kp set to: ");
-        Serial.println(Kp);
-      }
-      else if (param == 'i')
-      {
-        Ki = value;
-        myPID.SetTunings(Kp, Ki, Kd);
-        Serial.print("Ki set to: ");
-        Serial.println(Ki);
-      }
-      else if (param == 'd')
-      {
-        Kd = value;
-        myPID.SetTunings(Kp, Ki, Kd);
-        Serial.print("Kd set to: ");
-        Serial.println(Kd);
-      }
-      while (Serial.available() && Serial.peek() != '\n') Serial.read();  // Clear buffer
-    }
-    else if (cmd == 'l')
-    {
-      char param = Serial.read();
-      float value = Serial.parseFloat();
-
-      if (param == 'n')
-      {
-        minAngle = value;
-        Serial.print("Min angle limit set to: ");
-        Serial.println(minAngle);
-      }
-      else if (param == 'x')
-      {
-        maxAngle = value;
-        Serial.print("Max angle limit set to: ");
-        Serial.println(maxAngle);
-      }
-      else if (param == 'e')
-      {
-        angleLimitsEnabled = (value != 0);
-        Serial.print("Angle limits ");
-        Serial.println(angleLimitsEnabled ? "ENABLED" : "DISABLED");
-      }
-      while (Serial.available() && Serial.peek() != '\n') Serial.read();  // Clear buffer
-    }
-  }
+  Serial.println("theta_des,theta_meas,omega_meas,u_cmd");
 }
 
+// ===================== LOOP =====================
 void loop()
 {
-  processSerialCommands();  // Process incoming serial commands
-  
-  unsigned long currentTime = millis();
+  unsigned long now = micros();
 
-  // Serial.println(startTime);
-  if (currentTime - lastPIDTime >= pidInterval)
+  if ((unsigned long)(now - lastControlMicros) >= controlPeriodMicros)
   {
-    updatePID();
-    lastPIDTime = currentTime;
+    float dt = (now - lastControlMicros) * 1e-6;
+    lastControlMicros = now;
 
-    // Debug output every 100ms
-    static unsigned long lastDebugTime = 0;
-    if (currentTime - lastDebugTime >= 100)
+    readEncoderState(dt);
+    stopIfFault();
+
+    // Position error
+    float e = theta_des - theta_meas;
+
+    // Integral term with anti-windup clamp
+    e_int += e * dt;
+    e_int = constrain(e_int, -eIntMax, eIntMax);
+
+    // Derivative term:
+    // For constant position setpoint, de/dt = -omega_meas.
+    // This is cleaner than differentiating noisy position error.
+    // float e_dot = -omega_meas;
+    float e_dot = (e - e_prev) / dt;
+    e_prev = e;
+
+    float u = Kp * e + Ki * e_int + Kd * e_dot;
+
+    // Saturate command
+    float u_sat = constrain(u, -400.0, 400.0);
+
+    // Extra anti-windup: stop integrating if saturated in the same direction
+    if ((u != u_sat) && ((e > 0 && u > 0) || (e < 0 && u < 0)))
     {
-      Serial.print("mode: ");
-      Serial.print(positionControlMode ? "POS" : "SPD");
-      Serial.print(" | setpoint: ");
-      Serial.print(setpoint);
-      Serial.print(" | input: ");
-      Serial.print(input);
-      Serial.print(" | output: ");
-      Serial.print(output);
-      Serial.print(" | position: ");
-      Serial.print(encoderAngle);
-      Serial.print("° | speed: ");
-      Serial.print(currentSpeed);
-      Serial.print("°/s | limits: [");
-      Serial.print(minAngle);
-      Serial.print(", ");
-      Serial.print(maxAngle);
-      Serial.print("] ");
-      Serial.println(angleLimitsEnabled ? "(ON)" : "(OFF)");
-      lastDebugTime = currentTime;
+      e_int -= e * dt;
+      e_int = constrain(e_int, -eIntMax, eIntMax);
+    }
+
+    setMotorCommand(u_sat);
+
+    // Print at lower rate to avoid slowing control loop
+    printCounter++;
+    if (printCounter >= printEvery)
+    {
+      printCounter = 0;
+
+      Serial.print(theta_des, 4);
+      Serial.print(",");
+      Serial.print(theta_meas, 4);
+      Serial.print(",");
+      Serial.print(omega_meas, 4);
+      Serial.print(",");
+      Serial.println(u_sat, 2);
     }
   }
 }
