@@ -1,28 +1,32 @@
 #include "G2MotorDriver.h"
 
-// ===================== MOTOR DRIVER PINS =====================
-// IMPORTANT: Do NOT use default constructor, because default DIR pin = 2,
-// which conflicts with encoderPinA = 2.
-//
-// Wiring:
-// DIR  -> 7
-// PWM  -> 9   // Timer1, 20 kHz on Arduino Uno with this library
-// SLP  -> 4
-// FLT  -> 6
-// CS   -> A0
+// Driver config
+
+//driver 1
 const uint8_t MD_DIR = 7;
 const uint8_t MD_PWM = 11;
 const uint8_t MD_SLP = 4;
 const uint8_t MD_FLT = 6;
 const uint8_t MD_CS = A0;
 
+//driver 2 TODO
+// const uint8_t MD_DIR2 = 7;
+// const uint8_t MD_PWM2 = 11;
+// const uint8_t MD_SLP2 = 4;
+// const uint8_t MD_FLT2 = 6;
+// const uint8_t MD_CS2 = A0;
+
 // Limit switch pins 
-const uint8_t limitSwitchPin1 = 4;
-const uint8_t limitSwitchPin2 = 9;
+const uint8_t limitSwitchPin1 = 20;
+const uint8_t limitSwitchPin2 = 21;
+
+const float maxTheta1 = PI;
+const float maxTheta2 = PI;
 
 G2MotorDriver24v13 md(MD_DIR, MD_PWM, MD_SLP, MD_FLT, MD_CS);
+// G2MotorDriver24v13 md2(MD_DIR2, MD_PWM2, MD_SLP2, MD_FLT2, MD_CS2);
 
-// ===================== ENCODER PINS =====================
+// encoder config
 const uint8_t encoderPinA = 2;
 const uint8_t encoderPinB = 3;
 
@@ -87,6 +91,19 @@ void doEncoderB()
     encoderCount++;
 }
 
+void doLimit1()
+{
+  md.setBrake(400); // Full brake
+  delay(100); // Brief delay to ensure brake is applied
+  md.setBrake(0); // Sleep the driver to hold the brake
+}
+
+void doLimit2()
+{
+  // md2.setBrake(400); // Full brake
+  // Handle limit switch 2 interrupt
+}
+
 // ===================== FAULT CHECK =====================
 void stopIfFault()
 {
@@ -132,9 +149,15 @@ void readEncoderState(float dt)
 void setup()
 {
   Serial.begin(115200);
-
+  //to prevent motor kick on startup write PWM to low before starting the driver
+  digitalWrite(MD_PWM, LOW); 
   pinMode(encoderPinA, INPUT_PULLUP);
   pinMode(encoderPinB, INPUT_PULLUP);
+  pinMode(limitSwitchPin1, INPUT_PULLUP);
+  pinMode(limitSwitchPin2, INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(limitSwitchPin1), doLimit1, FALLING);
+  attachInterrupt(digitalPinToInterrupt(limitSwitchPin2), doLimit2, FALLING);
 
   attachInterrupt(digitalPinToInterrupt(encoderPinA), doEncoderA, CHANGE);
   attachInterrupt(digitalPinToInterrupt(encoderPinB), doEncoderB, CHANGE);
@@ -156,6 +179,15 @@ void setup()
   lastControlMicros = micros();
 
   Serial.println("theta_des,theta_meas,omega_meas,u_cmd");
+  Serial.println("Homing motor...");
+  do {
+    md.setSpeed(-200); // Move towards limit switch at moderate speed
+    delay(100);
+  } while (digitalRead(limitSwitchPin1) == HIGH); // Wait until limit switch is triggered
+  doLimit1(); // Apply brake to hold position
+  theta_des = 0.0; // Set current position as zero reference
+  Serial.println("Homing complete, beginning control.");
+
 }
 
 // ===================== LOOP =====================
@@ -198,7 +230,10 @@ void loop()
     }
 
     setMotorCommand(u_sat);
-
+    if (theta_meas >= maxTheta1)
+    {
+      doLimit1();
+    }
     // Print at lower rate to avoid slowing control loop
     printCounter++;
     if (printCounter >= printEvery)
@@ -213,5 +248,6 @@ void loop()
       Serial.print(",");
       Serial.println(u_sat, 2);
     }
+
   }
 }
