@@ -221,14 +221,6 @@ void loop()
     readEncoderState(dt);
     stopIfFault();
 
-    //Unlocks the system movement if moving away from the button
-    if (systemLock) {
-      // If locked against Switch 1 (Left), unlock only if driving right (positive)
-      if ((digitalRead(limitSwitchPin1) == LOW && theta_des > theta_meas)||(theta_meas >= maxTheta1 && theta_des < theta_meas)) {
-        systemLock = false;
-      }
-    }
-
     // Position error
     float e = theta_des - theta_meas;
 
@@ -247,6 +239,14 @@ void loop()
 
     // Saturate command
     float u_sat = constrain(u, -400.0, 400.0);
+
+    //Unlocks the system movement if moving away from the button
+    if (systemLock) {
+      // If locked against Switch 1 (Left), unlock only if driving right (positive)
+      if ((digitalRead(limitSwitchPin1) == LOW && u_sat > 0)||(theta_meas >= maxTheta1 && u_sat < 0)) {
+        systemLock = false;
+      }
+    }
 
     // Extra anti-windup: stop integrating if saturated in the same direction
     if ((u != u_sat) && ((e > 0 && u > 0) || (e < 0 && u < 0)))
