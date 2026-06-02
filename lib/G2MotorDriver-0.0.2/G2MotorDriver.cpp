@@ -124,10 +124,11 @@ void G2MotorDriver::setBrake(int brake)
         brake = -brake;
     }
 
-    if (brake > 400)  // Max brake
+    if (brake > 400)  // Max brake      //Found Bug (had no braces for if)
+    {
         brake = 400;
         digitalWrite(_DIRPin, LOW);
-
+    }
     #ifdef G2MOTORDRIVER_TIMER1_AVAILABLE
     if (_PWMPin == _PWM_TIMER1_PIN_A)
     {

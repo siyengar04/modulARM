@@ -23,6 +23,10 @@ const uint8_t limitSwitchPin2 = 21;
 const float maxTheta1 = PI;
 const float maxTheta2 = PI;
 
+//interrupt flags and nested delay for interrupt var
+volatile bool calibrated = false;
+volatile bool systemLock = false;
+
 G2MotorDriver24v13 md(MD_DIR, MD_PWM, MD_SLP, MD_FLT, MD_CS);
 // G2MotorDriver24v13 md2(MD_DIR2, MD_PWM2, MD_SLP2, MD_FLT2, MD_CS2);
 
@@ -94,8 +98,17 @@ void doEncoderB()
 void doLimit1()
 {
   md.setBrake(400); // Full brake
-  delay(100); // Brief delay to ensure brake is applied
-  md.setBrake(0); // Sleep the driver to hold the brake
+  
+  if (!calibrated) //Gets the reference angle if not calibrated yet
+  {
+    theta_meas = 0.0;
+    calibrated = true;
+  }
+  else            //Flags the program to not move further when the button is pressed
+  {
+    systemLock = true;
+    Serial.println("Interrupt Triggered: movement is locked until arm moves right.");
+  }
 }
 
 void doLimit2()
@@ -124,6 +137,12 @@ void stopIfFault()
 // ===================== MOTOR COMMAND =====================
 void setMotorCommand(float u)
 {
+  if (systemLock) 
+  {
+    Serial.println("Motor moving out of bounds. Movement instruction canceled.");
+    md.setBrake(400);
+    return;
+  }
   int u_cmd = (int)constrain(u, -400.0, 400.0);
   md.setSpeed(u_cmd);
 }
@@ -194,7 +213,6 @@ void setup()
 void loop()
 {
   unsigned long now = micros();
-
   if ((unsigned long)(now - lastControlMicros) >= controlPeriodMicros)
   {
     float dt = (now - lastControlMicros) * 1e-6;
@@ -202,6 +220,14 @@ void loop()
 
     readEncoderState(dt);
     stopIfFault();
+
+    //Unlocks the system movement if moving away from the button
+    if (systemLock) {
+      // If locked against Switch 1 (Left), unlock only if driving right (positive)
+      if ((digitalRead(limitSwitchPin1) == LOW && theta_des > theta_meas)||(theta_meas >= maxTheta1 && theta_des < theta_meas)) {
+        systemLock = false;
+      }
+    }
 
     // Position error
     float e = theta_des - theta_meas;
@@ -229,11 +255,12 @@ void loop()
       e_int = constrain(e_int, -eIntMax, eIntMax);
     }
 
-    setMotorCommand(u_sat);
-    if (theta_meas >= maxTheta1)
+    if (theta_meas >= maxTheta1)  //prevents movement if passed threshold by triggering systemLock
     {
       doLimit1();
     }
+    setMotorCommand(u_sat);
+    
     // Print at lower rate to avoid slowing control loop
     printCounter++;
     if (printCounter >= printEvery)
