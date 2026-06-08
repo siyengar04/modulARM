@@ -99,15 +99,11 @@ void doLimit1()
 {
   md.setBrake(400); // Full brake
   
-  if (!calibrated) //Gets the reference angle if not calibrated yet
-  {
-    theta_meas = 0.0;
-    calibrated = true;
-  }
-  else            //Flags the program to not move further when the button is pressed
+  if (calibrated && !systemLock)            //Flags the program to not move further when the button is pressed
   {
     systemLock = true;
-    Serial.println("Interrupt Triggered: movement is locked until arm moves right.");
+    Serial.println("Interrupt Triggered: movement is locked until arm moves in bounds.");
+    return;
   }
 }
 
@@ -115,6 +111,38 @@ void doLimit2()
 {
   // md2.setBrake(400); // Full brake
   // Handle limit switch 2 interrupt
+}
+// Forces system to wait for user input to start PID.
+void waitForUserStart() {
+  Serial.println("\n==============================================");
+  Serial.println("Do you want it to start? (Y/N)");
+  Serial.println("==============================================");
+
+  while (true) {
+    if (Serial.available() > 0) {
+      char response = Serial.read();
+
+      // Check for yes (both uppercase and lowercase)
+      if (response == 'Y' || response == 'y') {
+        Serial.println("Input Y detected. Starting...");
+        return; // Exit the loop and start the system
+      }
+      // Check for no (both uppercase and lowercase)
+      else if (response == 'N' || response == 'n') {
+        Serial.println("System remains idle. Waiting for 'Y' to start...");
+      }
+      // Ignore trailing newline or carriage return characters from entering again
+      else if (response == '\n' || response == '\r') {
+        continue;
+      }
+      // Handle invalid inputs
+      else {
+        Serial.print("Invalid input '");
+        Serial.print(response);
+        Serial.println("'. Please enter Y or N.");
+      }
+    }
+  }
 }
 
 // ===================== FAULT CHECK =====================
@@ -175,7 +203,6 @@ void setup()
   pinMode(limitSwitchPin1, INPUT_PULLUP);
   pinMode(limitSwitchPin2, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(limitSwitchPin1), doLimit1, FALLING);
   attachInterrupt(digitalPinToInterrupt(limitSwitchPin2), doLimit2, FALLING);
 
   attachInterrupt(digitalPinToInterrupt(encoderPinA), doEncoderA, CHANGE);
@@ -189,6 +216,7 @@ void setup()
   md.setSpeed(0);
   delay(10);
   // Now enable the driver
+  waitForUserStart();
   md.Wake();
   delay(10);
   // Calibrate current sensor at zero command
@@ -203,11 +231,25 @@ void setup()
     md.setSpeed(-200); // Move towards limit switch at moderate speed
     delay(100);
   } while (digitalRead(limitSwitchPin1) == HIGH); // Wait until limit switch is triggered
-  doLimit1(); // Apply brake to hold position
-  theta_des = 0.0; // Set current position as zero reference
-  Serial.println("Homing complete, beginning control.");
+  md.setBrake(400);
+  encoderCount = 0;
+  theta_meas = 0.0; // Set current position as zero reference
+  calibrated = true;
+  Serial.println("Homing complete.");
 
+  // 2. Put the driver chip into low-power sleep mode
+  md.Sleep();
+  delay(50);
+  waitForUserStart();
+  md.Wake();
+  delay(10);
+  md.setSpeed(0);
+
+  attachInterrupt(digitalPinToInterrupt(limitSwitchPin1), doLimit1, FALLING);
+  
+  lastControlMicros = micros();
 }
+
 
 // ===================== LOOP =====================
 void loop()
@@ -243,8 +285,10 @@ void loop()
     //Unlocks the system movement if moving away from the button
     if (systemLock) {
       // If locked against Switch 1 (Left), unlock only if driving right (positive)
+      // If out of bounds on the right, unlock if moving left
       if ((digitalRead(limitSwitchPin1) == LOW && u_sat > 0)||(theta_meas >= maxTheta1 && u_sat < 0)) {
         systemLock = false;
+        Serial.println("Motor moving within bounds. Movement unlocked.");
       }
     }
 
@@ -255,7 +299,7 @@ void loop()
       e_int = constrain(e_int, -eIntMax, eIntMax);
     }
 
-    if (theta_meas >= maxTheta1)  //prevents movement if passed threshold by triggering systemLock
+    if (theta_meas >= maxTheta1 && !systemLock)  //prevents movement if passed threshold by triggering systemLock
     {
       doLimit1();
     }

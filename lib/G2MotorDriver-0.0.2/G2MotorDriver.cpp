@@ -124,7 +124,7 @@ void G2MotorDriver::setBrake(int brake)
         brake = -brake;
     }
 
-    if (brake > 400)  // Max brake      //Found Bug (had no braces for if)
+    if (brake > 400)  // Max brake
     {
         brake = 400;
         digitalWrite(_DIRPin, LOW);
@@ -143,7 +143,10 @@ void G2MotorDriver::setBrake(int brake)
         analogWrite(_PWMPin, brake * 51 / 80); // map 400 to 255
     }
     #else
+    {
         analogWrite(_PWMPin, brake * 51 / 80); // map 400 to 255
+    }
+    delay(750);
     #endif
 }
 
