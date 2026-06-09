@@ -53,7 +53,7 @@ float Ki = 300.0;
 float Kd = 2.0;
 
 // ===================== SETPOINT =====================
-float theta_des = 2.0; // rad
+float theta_des = PI; // rad (PI by default)
 
 // ===================== PID STATES =====================
 float e_int = 0.0;
@@ -95,24 +95,98 @@ void doEncoderB()
     encoderCount++;
 }
 
-void doLimit1()
-{
-  md.setBrake(400); // Full brake
+// void doLimit1()
+// {
+//   md.setBrake(400); // Full brake
   
-  if (calibrated && !systemLock)            //Flags the program to not move further when the button is pressed
-  {
-    systemLock = true;
-    Serial.println("Interrupt Triggered: movement is locked until arm moves in bounds.");
-    return;
+//   if (calibrated && !systemLock)            //Flags the program to not move further when the button is pressed
+//   {
+//     systemLock = true;
+//     Serial.println("Interrupt Triggered: movement is locked until arm moves in bounds.");
+//     return;
+//   }
+// }
+
+// void doLimit2()
+// {
+//   // md2.setBrake(400); // Full brake
+//   // Handle limit switch 2 interrupt
+// }
+
+void set_theta_des() 
+{
+  //Clear buffer
+  delay(10);
+  while (Serial.available() > 0) {
+    Serial.read();
   }
+
+  //Prompt User
+  Serial.println("==============================================");
+  Serial.print("Enter desired position in radians (0.00 to ");
+  Serial.print(maxTheta1, 2);
+  Serial.println("):");
+  Serial.println("==============================================");
+
+  String inputStr = "";
+  while (Serial.available() == 0)
+  {
+    if (Serial.available() > 0) 
+    {
+      char c = Serial.read();
+
+      // Check if character is Enter ('\n' = Newline, '\r' = Carriage Return)
+      if (c == '\n' || c == '\r') 
+      {
+        // Only break the loop if the user actually typed a value first
+        if (inputStr.length() > 0) {
+          break; 
+        }
+      } 
+      // Accumulate characters into our string
+      else 
+      {
+        inputStr += c;
+        Serial.print(c); // Echo the character back to the screen as you type it
+      }
+    }
+  }
+  
+  Serial.println();
+  
+  float new_theta = inputStr.toFloat();
+
+  new_theta = constrain(new_theta, 0.0, maxTheta1);
+
+  theta_des = new_theta;
+
+  // 8. Print confirmation
+  Serial.print("Target position successfully set to: ");
+  Serial.println(theta_des, 4);
+
+  Serial.println("----------------------------------------------");
+  Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
+  Serial.println("----------------------------------------------");
+
+  delay(10);
+  while (Serial.available() > 0) { Serial.read(); }
+
+  while (true) 
+  {
+    if (Serial.available() > 0) 
+    {
+      char c = Serial.read();
+      if (c == '\n' || c == '\r') {
+        break; // Exit and return control to setup/loop
+      }
+    }
+  }
+  
+  Serial.println("Motor engaged! Starting control loop...");
+  return;
+
 }
 
-void doLimit2()
-{
-  // md2.setBrake(400); // Full brake
-  // Handle limit switch 2 interrupt
-}
-// Forces system to wait for user input to start PID.
 void waitForUserStart() {
   Serial.println("\n==============================================");
   Serial.println("Do you want it to start? (Y/N)");
@@ -124,7 +198,11 @@ void waitForUserStart() {
 
       // Check for yes (both uppercase and lowercase)
       if (response == 'Y' || response == 'y') {
-        Serial.println("Input Y detected. Starting...");
+        Serial.println("Input Y detected.");
+        if (calibrated) 
+        {
+          set_theta_des();
+        }
         return; // Exit the loop and start the system
       }
       // Check for no (both uppercase and lowercase)
@@ -144,6 +222,8 @@ void waitForUserStart() {
     }
   }
 }
+
+
 
 // ===================== FAULT CHECK =====================
 void stopIfFault()
@@ -165,20 +245,20 @@ void stopIfFault()
 // ===================== MOTOR COMMAND =====================
 void setMotorCommand(float u)
 {
-  if (systemLock) 
-  {
-      // If locked against Switch 1 (Left), unlock only if driving right (positive)
-      // If out of bounds on the right, unlock if moving left
-    if ((digitalRead(limitSwitchPin1) == LOW && u > 0)||(theta_meas >= maxTheta1 && u < 0)) {
-      systemLock = false;
-      Serial.println("Motor moving within bounds. Movement unlocked.");
-    }
-    else 
-    {
-      md.setBrake(400);
-      return;
-    }
-  }
+  // if (systemLock) 
+  // {
+  //     // If locked against Switch 1 (Left), unlock only if driving right (positive)
+  //     // If out of bounds on the right, unlock if moving left
+  //   if ((digitalRead(limitSwitchPin1) == LOW && u > 0)||(theta_meas >= maxTheta1 && u < 0)) {
+  //     systemLock = false;
+  //     Serial.println("Motor moving within bounds. Movement unlocked.");
+  //   }
+  //   else 
+  //   {
+  //     md.setBrake(400);
+  //     return;
+  //   }
+  // }
   int u_cmd = (int)constrain(u, -400.0, 400.0);
   md.setSpeed(u_cmd);
 }
@@ -211,7 +291,7 @@ void setup()
   pinMode(limitSwitchPin1, INPUT_PULLUP);
   pinMode(limitSwitchPin2, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(limitSwitchPin2), doLimit2, FALLING);
+  // attachInterrupt(digitalPinToInterrupt(limitSwitchPin2), doLimit2, FALLING);
 
   attachInterrupt(digitalPinToInterrupt(encoderPinA), doEncoderA, CHANGE);
   attachInterrupt(digitalPinToInterrupt(encoderPinB), doEncoderB, CHANGE);
@@ -254,7 +334,7 @@ void setup()
   md.Wake();
   md.setSpeed(0);
 
-  attachInterrupt(digitalPinToInterrupt(limitSwitchPin1), doLimit1, FALLING);
+  // attachInterrupt(digitalPinToInterrupt(limitSwitchPin1), doLimit1, FALLING);
   
   lastControlMicros = micros();
 }
@@ -274,6 +354,15 @@ void loop()
 
     // Position error
     float e = theta_des - theta_meas;
+
+    //Just me having Fun --Aaron
+    // if (theta_des > 0.01 && abs(e) < 0.02)
+    // {
+    //   Serial.println("--> Target destination reached! Resetting target to 0.0 rad.");
+      
+    //   theta_des = 0.0;             // Automatically switch target back to home!
+    //   e = theta_des - theta_meas;  // Instantly recalculate error so the PID doesn't glitch
+    // }
 
     // Integral term with anti-windup clamp
     e_int += e * dt;
@@ -298,9 +387,9 @@ void loop()
       e_int = constrain(e_int, -eIntMax, eIntMax);
     }
 
-    if (theta_meas >= maxTheta1 && !systemLock)  //prevents movement if passed threshold by triggering systemLock
+    if (theta_meas >= maxTheta1 || limitSwitchPin1 == LOW)  //prevents movement if passed threshold by triggering systemLock
     {
-      doLimit1();
+      u_sat = 0;
     }
     setMotorCommand(u_sat);
     
@@ -308,9 +397,6 @@ void loop()
     printCounter++;
     if (printCounter >= printEvery)
     {
-      printCounter = 0;
-      Serial.println(encoderCount);
-      Serial.print(",");
       Serial.print(theta_des, 4);
       Serial.print(",");
       Serial.print(theta_meas, 4);
