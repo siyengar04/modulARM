@@ -53,7 +53,7 @@ float Ki = 300.0;
 float Kd = 2.0;
 
 // ===================== SETPOINT =====================
-float theta_des = PI; // rad
+float theta_des = 2.0; // rad
 
 // ===================== PID STATES =====================
 float e_int = 0.0;
@@ -167,9 +167,17 @@ void setMotorCommand(float u)
 {
   if (systemLock) 
   {
-    Serial.println("Motor moving out of bounds. Movement instruction canceled.");
-    md.setBrake(400);
-    return;
+      // If locked against Switch 1 (Left), unlock only if driving right (positive)
+      // If out of bounds on the right, unlock if moving left
+    if ((digitalRead(limitSwitchPin1) == LOW && u > 0)||(theta_meas >= maxTheta1 && u < 0)) {
+      systemLock = false;
+      Serial.println("Motor moving within bounds. Movement unlocked.");
+    }
+    else 
+    {
+      md.setBrake(400);
+      return;
+    }
   }
   int u_cmd = (int)constrain(u, -400.0, 400.0);
   md.setSpeed(u_cmd);
@@ -231,18 +239,19 @@ void setup()
     md.setSpeed(-200); // Move towards limit switch at moderate speed
     delay(100);
   } while (digitalRead(limitSwitchPin1) == HIGH); // Wait until limit switch is triggered
-  md.setBrake(400);
+  md.setSpeed(0);
   encoderCount = 0;
   theta_meas = 0.0; // Set current position as zero reference
+  e_int = 0.0;
+  e_prev = 0.0;
   calibrated = true;
   Serial.println("Homing complete.");
 
   // 2. Put the driver chip into low-power sleep mode
-  md.Sleep();
   delay(50);
+  md.Sleep();
   waitForUserStart();
   md.Wake();
-  delay(10);
   md.setSpeed(0);
 
   attachInterrupt(digitalPinToInterrupt(limitSwitchPin1), doLimit1, FALLING);
@@ -282,16 +291,6 @@ void loop()
     // Saturate command
     float u_sat = constrain(u, -400.0, 400.0);
 
-    //Unlocks the system movement if moving away from the button
-    if (systemLock) {
-      // If locked against Switch 1 (Left), unlock only if driving right (positive)
-      // If out of bounds on the right, unlock if moving left
-      if ((digitalRead(limitSwitchPin1) == LOW && u_sat > 0)||(theta_meas >= maxTheta1 && u_sat < 0)) {
-        systemLock = false;
-        Serial.println("Motor moving within bounds. Movement unlocked.");
-      }
-    }
-
     // Extra anti-windup: stop integrating if saturated in the same direction
     if ((u != u_sat) && ((e > 0 && u > 0) || (e < 0 && u < 0)))
     {
@@ -310,7 +309,8 @@ void loop()
     if (printCounter >= printEvery)
     {
       printCounter = 0;
-
+      Serial.println(encoderCount);
+      Serial.print(",");
       Serial.print(theta_des, 4);
       Serial.print(",");
       Serial.print(theta_meas, 4);
