@@ -129,7 +129,7 @@ void set_theta_des()
   Serial.println("==============================================");
 
   String inputStr = "";
-  while (Serial.available() == 0)
+  while (true)
   {
     if (Serial.available() > 0) 
     {
@@ -147,7 +147,7 @@ void set_theta_des()
       else 
       {
         inputStr += c;
-        Serial.print(c); // Echo the character back to the screen as you type it
+        Serial.print(c);
       }
     }
   }
@@ -181,6 +181,9 @@ void set_theta_des()
       }
     }
   }
+
+  delay(50);
+  while (Serial.available() > 0) { Serial.read(); }
   
   Serial.println("Motor engaged! Starting control loop...");
   return;
@@ -343,6 +346,26 @@ void setup()
 // ===================== LOOP =====================
 void loop()
 {
+  if (Serial.available() > 0) 
+  {
+    md.setSpeed(0);
+    md.Sleep(); 
+
+    set_theta_des();
+
+    e_int = 0.0;
+    
+    unsigned long now_pre = micros();
+    float dt_pre = (now_pre - lastControlMicros) * 1e-6;
+    if (dt_pre <= 0) dt_pre = 0.002; 
+    readEncoderState(dt_pre);
+    
+    e_prev = theta_des - theta_meas; 
+
+    md.Wake();
+    lastControlMicros = micros();
+  }
+
   unsigned long now = micros();
   if ((unsigned long)(now - lastControlMicros) >= controlPeriodMicros)
   {
@@ -387,7 +410,7 @@ void loop()
       e_int = constrain(e_int, -eIntMax, eIntMax);
     }
 
-    if (theta_meas >= maxTheta1 || limitSwitchPin1 == LOW)  //prevents movement if passed threshold by triggering systemLock
+    if (((theta_meas >= maxTheta1) && u_sat > 0) || (theta_meas <= 0 && u_sat < 0))  
     {
       u_sat = 0;
     }
