@@ -20,10 +20,11 @@ const uint8_t MD_CS = A0;
 const uint8_t limitSwitchPin1 = 20;
 const uint8_t limitSwitchPin2 = 21;
 
-const float maxTheta1 = PI;
-const float maxTheta2 = PI;
+const float maxTheta1 = 3;
+const float maxTheta2 = 3;
 
 volatile bool calibrated = false;
+volatile bool systemLock = false;
 
 G2MotorDriver24v13 md(MD_DIR, MD_PWM, MD_SLP, MD_FLT, MD_CS);
 // G2MotorDriver24v13 md2(MD_DIR2, MD_PWM2, MD_SLP2, MD_FLT2, MD_CS2);
@@ -112,20 +113,21 @@ void doEncoderA()
 
  void doLimit1()
  {
-  // Pauses Program indefinitely until reset button is pressed
-   md.setBrake(400);
-   while(true){};
+  md.setSpeed(0);
+  // md2.setSpeed(0);
+  systemLock = true;
  }
 
-// void doLimit2()
-// {
-//   // md2.setBrake(400); // Full brake
-//   // Handle limit switch 2 interrupt
-// }
+void doLimit2()
+{
+  // md2.setSpeed(0);
+  md.setSpeed(0);
+  systemLock = true;
+}
 
 // ===================== USER INPUT FUNCTIONS =====================  //ONLY HANDLES ONE MOTOR
 
-void set_theta_des(float theta_des, float maxTheta) 
+void set_theta_des(float &theta_des, float maxTheta) 
 {
   //Clear buffer
   delay(10);
@@ -174,7 +176,7 @@ void set_theta_des(float theta_des, float maxTheta)
 
   // 8. Print confirmation
   Serial.print("Target position successfully set to: ");
-  Serial.println(theta_desA, 4);
+  Serial.println(theta_des, 4);
 
   Serial.println("----------------------------------------------");
   Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
@@ -337,7 +339,7 @@ float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, 
   }
 
   // Boundary check
-  if (((theta_meas >= maxTheta) && u_sat > 0) || (theta_meas <= 0 && u_sat < 0))  
+  if (((theta_meas >= maxTheta) && u_sat > 0) || (theta_meas <= 0.14 && u_sat < 0))  
   {
     u_sat = 0;
   }
@@ -390,6 +392,16 @@ void setup()
   theta_measA = 0.0; // Set current position as zero reference
   e_intA = 0.0;
   e_prevA = 0.0;
+
+  // do {
+  //   md2.setSpeed(-200);
+  //   delay(100);
+  // } while (digitalRead(limitSwitchPin2) == HIGH);
+  // md2.setSpeed(0);
+  // encoderCountB = 0;
+  // theta_measB = 0.0;
+  // e_intB = 0.0;
+  // e_prevB = 0.0;
   calibrated = true;
   Serial.println("Homing complete.");
 
@@ -400,6 +412,13 @@ void setup()
   md.Wake();
   md.setSpeed(0);
 
+  #if defined(__AVR_ATmega2560__)
+    EIFR = bit(INTF0) | bit(INTF1); 
+  #endif
+
+  attachInterrupt(digitalPinToInterrupt(limitSwitchPin1), doLimit1, FALLING);
+  attachInterrupt(digitalPinToInterrupt(limitSwitchPin2), doLimit2, FALLING);
+
   lastControlMicros = micros();
 }
 
@@ -407,6 +426,18 @@ void setup()
 // ===================== LOOP =====================
 void loop()
 {
+  // After Calibration, if button hits the limit switch the program stops motors and requires reset
+  if (systemLock) {
+    md.setSpeed(0);
+    md.setBrake(400);
+    md.Sleep();
+    // md2.setSpeed(0);
+    // md2.setBrake(400);
+    // md2.Sleep();
+    Serial.println("Limit switch hit! Halting.");
+    while (true) { }
+  }
+
   keyPress();
 
   unsigned long now = micros();

@@ -24,6 +24,9 @@ Red --> "                          "
 Digital Pins 2, 3, 18, 19, 20, 21 
 Avoid 14 - 19 inclusive as they are UART pins
 
+## Teensy 4.1 Documentation
+https://www.pjrc.com/store/teensy41.html 
+
 ### Motors
 #### Motor 1
 ##### Driver:
