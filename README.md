@@ -33,7 +33,7 @@ https://www.pjrc.com/store/teensy41.html
 - Direction = 7
 - PWM = 11
 - Sleep = 4
-- FAULT = 6
+- FAULT = 30
 - Current Sense = A0
 
 ##### Encoder:
@@ -45,6 +45,14 @@ Limit Switch: 21
 
 #### Motor 2:
 TODO
+##### Driver:
+- Direction = 6
+- PWM = 12
+- Sleep = 4
+- FAULT = 30
+- Current Sense = A1
 
-
+##### Encoder:
+- A: 18
+- B: 19
 Limit Switch: 20
