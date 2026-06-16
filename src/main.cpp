@@ -523,7 +523,14 @@ void loop()
     float u_satA = calculatePID(theta_desA,theta_measA,maxTheta1, dt, e_intA, e_prevA, KpA, KiA, KdA);
     float u_satB = calculatePID(theta_desB, theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
     setMotorCommandA(u_satA);
-    setMotorCommandB(u_satB);
+    if (!systemLock)
+    {
+      setMotorCommandB(u_satB);
+    }
+    else 
+    {
+      md.setSpeed(0);
+    }
     
     // Print at lower rate to avoid slowing control loop
     printCounter++;

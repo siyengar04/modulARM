@@ -44,7 +44,6 @@ Limit Switch: 21
 
 
 #### Motor 2:
-TODO
 ##### Driver:
 - Direction = 6
 - PWM = 12
@@ -55,4 +54,5 @@ TODO
 ##### Encoder:
 - A: 18
 - B: 19
+
 Limit Switch: 20
