@@ -112,37 +112,11 @@ void set_theta_des(float &theta_des, float maxTheta)
   Serial.println("):");
   Serial.println("==============================================");
 
-  String inputStr = "";
-  while (true)
-  {
-    if (Serial.available() > 0) 
-    {
-      char c = Serial.read();
+  Serial.setTimeout(10000);
 
-      // Check if character is Enter ('\n' = Newline, '\r' = Carriage Return)
-      if (c == '\n' || c == '\r') 
-      {
-        // Only break the loop if the user actually typed a value first
-        if (inputStr.length() > 0) {
-          break; 
-        }
-      } 
-      // Accumulate characters into our string
-      else 
-      {
-        inputStr += c;
-        Serial.print(c);
-      }
-    }
-  }
-  
-  Serial.println();
-  
-  float new_theta = inputStr.toFloat();
+  float new_theta = Serial.parseFloat();
 
-  new_theta = constrain(new_theta, 0.0, maxTheta);
-
-  theta_des = new_theta;
+  theta_des = constrain(new_theta, 0.0, maxTheta);
 
   // 8. Print confirmation
   Serial.print("Target position successfully set to: ");
@@ -380,7 +354,7 @@ void setup()
 
   Serial.println("Homing motor B...");
   do {
-    md2.setSpeed(-100);
+    md2.setSpeed(-200);
     delay(100);
   } while (digitalRead(limitSwitchPinB2) == HIGH);
   md2.setSpeed(0);
@@ -433,10 +407,7 @@ void loop()
     stopIfFault();
 
     float u_satB = calculatePID(theta_desB, theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
-    if (!systemLock)
-    {
-      setMotorCommandB(u_satB);
-    }
+    setMotorCommandB(u_satB);
 
     
     // Print at lower rate to avoid slowing control loop

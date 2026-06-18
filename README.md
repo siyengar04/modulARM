@@ -45,7 +45,7 @@ Limit Switch: 21
 
 #### Motor 2:
 ##### Driver:
-- Direction = 6
+- Direction = 5
 - PWM = 12
 - Sleep = 4
 - FAULT = 30
