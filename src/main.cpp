@@ -13,7 +13,7 @@ const uint8_t limitSwitchPinB2 = 20;
 const uint8_t limitSwitchPinB1 = 8;
 
 const float maxTheta2 = 3;
-
+const float home = 0.0;
 const float maxCurrent = 0.6;
 
 volatile bool calibrated = false;
@@ -116,7 +116,7 @@ void set_theta_des(float &theta_des, float maxTheta)
 
   float new_theta = Serial.parseFloat();
 
-  theta_des = constrain(new_theta, 0.0, maxTheta);
+  theta_des = constrain(new_theta, home, maxTheta);
 
   // 8. Print confirmation
   Serial.print("Target position successfully set to: ");
