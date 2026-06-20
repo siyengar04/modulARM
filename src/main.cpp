@@ -97,13 +97,9 @@ void doLimit2()
 
 // ===================== USER INPUT FUNCTIONS =====================  //ONLY HANDLES ONE MOTOR
 
-void set_theta_des(float &theta_des, float maxTheta) 
-{
-  //Clear buffer
-  delay(10);
-  while (Serial.available() > 0) {
-    Serial.read();
-  }
+void set_theta_des(float &theta_des, float maxTheta)  {
+
+
 
   //Prompt User
   Serial.println("==============================================");
@@ -123,7 +119,8 @@ void set_theta_des(float &theta_des, float maxTheta)
   Serial.println(theta_des, 4);
 
   return;
-
+  while (Serial.available() && Serial.peek() != '\n')
+    Serial.read(); // Clear buffer
 }
 
 void waitForUserStart() {
