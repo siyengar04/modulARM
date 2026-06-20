@@ -63,12 +63,6 @@ float KiB = 300.0;
 float KdB = 2.0;
 
 // ===================== SETPOINT =====================
-// prep for when we want multiple states per instruction set
-// float* pi = PI;
-// float* theta_desA = &pi;
-// float* theta_desB = &pi;
-// int num_of_pos = 1;
-
 float theta_desA = PI; // rad (PI by default)
 float theta_desB = PI;
 
@@ -166,11 +160,7 @@ void set_theta_des(float &theta_des, float maxTheta)
   Serial.println("==============================================");
   Serial.print("Enter desired position in radians (0.00 to ");
   Serial.print(maxTheta, 2);
-  Serial.println("):");       //comment out when switching to array
-  // Serial.print(") ");
-  // Serial.print("for position ");
-  // Serial.print(pos);
-  // Serial.println(":")
+  Serial.println("):"); 
   Serial.println("==============================================");
 
   Serial.setTimeout(10000);
@@ -179,14 +169,9 @@ void set_theta_des(float &theta_des, float maxTheta)
 
   theta_des = constrain(new_theta, home, maxTheta);
 
-  /* 
-   8. Print confirmation
-   Serial.print("Target position for state ");
-   Serial.print(pos);
-   Serial.print(" successfully set to: ");
-  Serial.print("Target position successfully set to: "); //comment out when switching to array
+  // Print confirmation
+  Serial.print("Target position successfully set to: "); 
   Serial.println(theta_des, 4);
-  */
 
   while (Serial.available() && Serial.peek() != '\n')
     Serial.read(); // Clear buffer
@@ -209,27 +194,6 @@ void waitForUserStart() {
         Serial.println("Input Y detected.");
         if (calibrated) 
         {
-
-          // TODO: Make the code work with multiple (array/vector). Need to rework the code to use malloc and realloc
-          // Requires adjustments with how to use theta_des to be a float pointer instead of a float
-
-          // // Prompt user for how many positions and to set positions
-          // Serial.println("\n==============================================");
-          // Serial.println("How many positions do you want? (Type an integer)");
-          // Serial.println("==============================================");
-
-          // num_of_pos = Serial.parseInt();
-          // theta_desA = (float*) malloc(num_of_pos * sizeof(float));
-          // theta_desB = (float*) malloc(num_of_pos * sizeof(float));
-
-          // for (int i = 0; i < num_of_pos; i++) {
-          // set_theta_des(theta_desA[i], maxTheta1, i);
-          // }
-
-          // for (int i = 0; i < num_of_pos; i++) {
-          // set_theta_des(theta_desB[i], maxTheta2, i);
-          // }
-
           set_theta_des(theta_desA, maxTheta1);
           set_theta_des(theta_desB, maxTheta2);
 
@@ -530,8 +494,6 @@ void loop()
 
   keyPress();
 
-  // int completed = 0;             // Checks how many elements of the array have been completed through the loop
-
   unsigned long now = micros();
   if ((unsigned long)(now - lastControlMicros) >= controlPeriodMicros)
   {
@@ -541,13 +503,6 @@ void loop()
     readEncoderState(dt, encoderCountA, prevCountA, theta_measA, omega_measA);
     readEncoderState(dt, encoderCountB, prevCountB, theta_measB, omega_measB);
     stopIfFault();
-
-    // if(theta_desA - theta_measA <= 0.05 && theta_desB - theta_measB <= 0.05) 
-    // {
-    //    completed++;
-    // }  
-
-    // TODO: adjust the 2 lines below to work with the arrays when we switch it over
 
     float u_satA = calculatePID(theta_desA,theta_measA,maxTheta1, dt, e_intA, e_prevA, KpA, KiA, KdA);
     float u_satB = calculatePID(theta_desB, theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
