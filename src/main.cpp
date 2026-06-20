@@ -98,9 +98,6 @@ void doLimit2()
 // ===================== USER INPUT FUNCTIONS =====================  //ONLY HANDLES ONE MOTOR
 
 void set_theta_des(float &theta_des, float maxTheta)  {
-
-
-
   //Prompt User
   Serial.println("==============================================");
   Serial.print("Enter desired position in radians (0.00 to ");
@@ -137,6 +134,7 @@ void waitForUserStart() {
         Serial.println("Input Y detected.");
         if (calibrated) 
         {
+          
           set_theta_des(theta_desB, maxTheta2);
 
           Serial.println("----------------------------------------------");
@@ -420,6 +418,8 @@ void loop()
       Serial.print(",");
       Serial.println(u_satB, 2);
       Serial.print("\n");
+
+      printCounter = 0;
     }
 
   }
