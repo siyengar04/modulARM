@@ -64,13 +64,15 @@ float KdB = 2.0;
 
 // ===================== SETPOINT =====================
 // prep for when we want multiple states per instruction set
-// float* pi = PI;
-// float* theta_desA = &pi;
-// float* theta_desB = &pi;
+// float* theta_desA = nullptr;
+// float* theta_desB = nullptr;
 // int num_of_pos = 1;
 
 float theta_desA = PI; // rad (PI by default)
 float theta_desB = PI;
+
+// int completed = 0;             // Checks how many elements of the array have been completed through the loop
+// const int MAX_STATES = 10;     // max allowed number of states
 
 // ===================== PID STATES =====================
 float e_intA = 0.0;
@@ -219,16 +221,15 @@ void waitForUserStart() {
           // Serial.println("==============================================");
 
           // num_of_pos = Serial.parseInt();
-          // theta_desA = (float*) malloc(num_of_pos * sizeof(float));
-          // theta_desB = (float*) malloc(num_of_pos * sizeof(float));
+          // theta_desA = (float*) realloc(theta_desA, num_of_pos * sizeof(float));
+          // theta_desB = (float*) realloc(theta_desB, num_of_pos * sizeof(float));
 
           // for (int i = 0; i < num_of_pos; i++) {
           // set_theta_des(theta_desA[i], maxTheta1, i);
-          // }
-
-          // for (int i = 0; i < num_of_pos; i++) {
           // set_theta_des(theta_desB[i], maxTheta2, i);
           // }
+
+          // completed = 0;
 
           set_theta_des(theta_desA, maxTheta1);
           set_theta_des(theta_desB, maxTheta2);
@@ -284,6 +285,22 @@ void keyPress()
     md2.Sleep();
     md.Sleep(); 
 
+    // // Prompt user for how many positions and to set positions
+    // Serial.println("\n==============================================");
+    // Serial.println("How many positions do you want? (Type an integer)");
+    // Serial.println("==============================================");
+
+    // num_of_pos = Serial.parseInt();
+    // theta_desA = (float *) realloc(theta_desA, num_of_pos * sizeof(float));
+    // theta_desB = (float *) realloc(theta_desB, num_of_pos * sizeof(float));
+    // num_of_pos = num_of_pos;
+    // for (int i = 0; i < num_of_pos; i++){
+    //   set_theta_des(theta_desA[i], maxTheta1, i);
+    //   set_theta_des(theta_desB[i], maxTheta2, i);
+    // }
+
+    // completed = 0;
+    
     set_theta_des(theta_desA, maxTheta1);
     set_theta_des(theta_desB, maxTheta2);
 
@@ -407,7 +424,7 @@ float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, 
 
   //Current Sense stuff
   float currentA = md.getCurrentMilliamps();
-  float currentB = md.getCurrentMilliamps();
+  float currentB = md2.getCurrentMilliamps();
   
   if ((((currentA / 2800) >= maxCurrent) || ((currentB / 2800) >= maxCurrent)) && ((omega_measA <= 3) || (omega_measB <= 3)))
   {
@@ -426,6 +443,12 @@ float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, 
 // ===================== SETUP =====================
 void setup()
 {
+  // Setup default vals for theta_des
+  // theta_desA = (float *) malloc(sizeof(float));
+  // theta_desB = (float *) malloc(sizeof(float));
+  // *theta_desA = PI;
+  // *theta_desB = PI;
+
   Serial.begin(115200);
   //to prevent motor kick on startup write PWM to low before starting the driver
   digitalWrite(MD_PWM, LOW); 
@@ -530,8 +553,6 @@ void loop()
 
   keyPress();
 
-  // int completed = 0;             // Checks how many elements of the array have been completed through the loop
-
   unsigned long now = micros();
   if ((unsigned long)(now - lastControlMicros) >= controlPeriodMicros)
   {
@@ -542,12 +563,17 @@ void loop()
     readEncoderState(dt, encoderCountB, prevCountB, theta_measB, omega_measB);
     stopIfFault();
 
-    // if(theta_desA - theta_measA <= 0.05 && theta_desB - theta_measB <= 0.05) 
+    // if(fabs(theta_desA[completed] - theta_measA) <= 0.05 && fabs(theta_desB[completed] - theta_measB) <= 0.05) 
     // {
-    //    completed++;
+        // if (completed < num_of_pos - 1){
+        //   completed++;
+        // }
     // }  
 
     // TODO: adjust the 2 lines below to work with the arrays when we switch it over
+
+    // float u_satA = calculatePID(theta_desA[completed], theta_measA, maxTheta1, dt, e_intA, e_prevA, KpA, KiA, KdA);
+    // float u_satB = calculatePID(theta_desB[completed], theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
 
     float u_satA = calculatePID(theta_desA,theta_measA,maxTheta1, dt, e_intA, e_prevA, KpA, KiA, KdA);
     float u_satB = calculatePID(theta_desB, theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
@@ -566,6 +592,7 @@ void loop()
     if (printCounter >= printEvery)
     {
       Serial.println("MotorA:");
+      // Serial.print(theta_desA[completed], 4);
       Serial.print(theta_desA, 4);
       Serial.print(",");
       Serial.print(theta_measA, 4);
@@ -575,6 +602,7 @@ void loop()
       Serial.println(u_satA, 2);
 
       Serial.println("MotorB:");
+      // Serial.print(theta_desB[completed], 4);
       Serial.print(theta_desB, 4);
       Serial.print(",");
       Serial.print(theta_measB, 4);
