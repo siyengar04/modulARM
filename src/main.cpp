@@ -128,9 +128,10 @@ void set_theta_des(float &theta_des, float maxTheta, int pos)  {
   Serial.print("Target position successfully set to: "); //comment out when switching to array
   Serial.println(theta_des, 4);
 
-  return;
   while (Serial.available() && Serial.peek() != '\n')
     Serial.read(); // Clear buffer
+  return;
+  
 }
 
 void waitForUserStart() {
