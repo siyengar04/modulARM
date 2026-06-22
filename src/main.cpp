@@ -44,7 +44,13 @@ float KiB = 300.0;
 float KdB = 2.0;
 
 // ===================== SETPOINT =====================
-float theta_desB = PI;
+//float theta_desB = PI;
+
+const int MAX_STATES = 10;     // max allowed number of states
+float theta_desB[MAX_STATES];
+int num_of_pos = 1;
+
+int completed = 0;
 
 // ===================== PID STATES =====================
 float e_intB = 0.0;
@@ -64,7 +70,7 @@ int printCounter = 0;
 const int printEvery = 30; // print every 30 control loops = 500 Hz
 
 // ==========================  Prototypes  ================================
-void readEncoderState(float dt, volatile long &encoderCount, long &prevCount, float &theta_meas, float &omega_meas);
+void readEncoderState(float dt, volatile long encoderCount, long &prevCount, float &theta_meas, float &omega_meas);
 
 // ===================== ENCODER ISR =====================
 void doEncoderC()
@@ -97,12 +103,16 @@ void doLimit2()
 
 // ===================== USER INPUT FUNCTIONS =====================  //ONLY HANDLES ONE MOTOR
 
-void set_theta_des(float &theta_des, float maxTheta)  {
+void set_theta_des(float &theta_des, float maxTheta, int pos)  {
   //Prompt User
   Serial.println("==============================================");
   Serial.print("Enter desired position in radians (0.00 to ");
   Serial.print(maxTheta, 2);
-  Serial.println("):");
+  // Serial.println("):");       //comment out when switching to array
+  Serial.print(") ");
+  Serial.print("for position ");
+  Serial.print(pos);
+  Serial.println(":");
   Serial.println("==============================================");
 
   Serial.setTimeout(10000);
@@ -111,8 +121,11 @@ void set_theta_des(float &theta_des, float maxTheta)  {
 
   theta_des = constrain(new_theta, home, maxTheta);
 
-  // 8. Print confirmation
-  Serial.print("Target position successfully set to: ");
+  // Print confirmation
+  Serial.print("Target position for state ");
+  Serial.print(pos);
+  Serial.print(" successfully set to: ");
+  Serial.print("Target position successfully set to: "); //comment out when switching to array
   Serial.println(theta_des, 4);
 
   return;
@@ -135,14 +148,29 @@ void waitForUserStart() {
         if (calibrated) 
         {
           
-          set_theta_des(theta_desB, maxTheta2);
+          // Prompt user for how many positions and to set positions
+          Serial.println("\n==============================================");
+          Serial.print("How many positions do you want? (Type an integer between 1 and ");
+          Serial.print(MAX_STATES);
+          Serial.println(")");
+          Serial.println("==============================================");
+
+          Serial.setTimeout(10000);
+          num_of_pos = Serial.parseInt();
+          num_of_pos = constrain(num_of_pos, 1, MAX_STATES);
+
+          for (int i = 0; i < num_of_pos; i++) {
+          set_theta_des(theta_desB[i], maxTheta2, i);
+          }
+
+          completed = 0;
 
           Serial.println("----------------------------------------------");
           Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
           Serial.println("----------------------------------------------");
 
           delay(10);
-          while (Serial.available() > 0) { Serial.read(); }
+          while (Serial.available() > 0 && Serial.peek() != '\n') { Serial.read(); }
           while (true) 
           {
             if (Serial.available() > 0) 
@@ -186,7 +214,25 @@ void keyPress()
     md2.setSpeed(0);
     md2.Sleep();
 
-    set_theta_des(theta_desB, maxTheta2);
+    // Prompt user for how many positions and to set positions
+    Serial.println("\n==============================================");
+    Serial.print("How many positions do you want? (Type an integer between 1 and ");
+    Serial.print(MAX_STATES);
+    Serial.println(")");
+    Serial.println("==============================================");
+
+    Serial.setTimeout(10000);
+
+    num_of_pos = Serial.parseInt();
+    num_of_pos = constrain(num_of_pos, 1, MAX_STATES);
+    Serial.print("Number of positions set to: ");
+    Serial.println(num_of_pos);
+
+    for (int i = 0; i < num_of_pos; i++){
+      set_theta_des(theta_desB[i], maxTheta2, i);
+    }
+
+    completed = 0;
 
     Serial.println("----------------------------------------------");
     Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
@@ -217,7 +263,7 @@ void keyPress()
     if (dt_pre <= 0) dt_pre = 0.002; 
     readEncoderState(dt_pre, encoderCountB, prevCountB, theta_measB, omega_measB);
     
-    e_prevB = theta_desB - theta_measB;
+    e_prevB = theta_desB[0] - theta_measB;
 
     md2.Wake();
     lastControlMicros = micros();
@@ -250,7 +296,7 @@ void setMotorCommandB(float u)
 }
 
 // ===================== READ ENCODER =====================
-void readEncoderState(float dt, volatile long &encoderCount, long &prevCount, float &theta_meas, float &omega_meas)
+void readEncoderState(float dt, volatile long encoderCount, long &prevCount, float &theta_meas, float &omega_meas)
 {
   long count;
 
@@ -329,6 +375,7 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(encoderBPinA), doEncoderC, CHANGE);
   attachInterrupt(digitalPinToInterrupt(encoderBPinB), doEncoderD, CHANGE);
 
+  theta_desB[0] = PI;
 
   md2.init();
   // Keep motor driver disabled during startup
@@ -401,7 +448,14 @@ void loop()
     readEncoderState(dt, encoderCountB, prevCountB, theta_measB, omega_measB);
     stopIfFault();
 
-    float u_satB = calculatePID(theta_desB, theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
+    if(fabs(theta_desB[completed] - theta_measB) <= 0.05) 
+    {
+        if (completed < num_of_pos - 1){
+          completed++;
+        }
+    }  
+
+    float u_satB = calculatePID(theta_desB[completed], theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
     setMotorCommandB(u_satB);
 
     
@@ -410,7 +464,7 @@ void loop()
     if (printCounter >= printEvery)
     {
       Serial.println("MotorB:");
-      Serial.print(theta_desB, 4);
+      Serial.print(theta_desB[completed], 4);
       Serial.print(",");
       Serial.print(theta_measB, 4);
       Serial.print(",");
