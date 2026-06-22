@@ -11,7 +11,7 @@ const uint8_t MD_CS = A0;
 
 //driver 2 TODO
 const uint8_t MD_DIR2 = 5;
-const uint8_t MD_PWM2 = 12;
+const uint8_t MD_PWM2 = 12;       //Needs to change (I think Pin 6 works)
 const uint8_t MD_SLP2 = 4;
 const uint8_t MD_FLT2 = 30;
 const uint8_t MD_CS2 = A1;
@@ -64,8 +64,10 @@ float KdB = 2.0;
 
 // ===================== SETPOINT =====================
 // prep for when we want multiple states per instruction set
-// float* theta_desA = nullptr;
-// float* theta_desB = nullptr;
+// float theta_desA[MAX_STATES];
+// float theta_desB[MAX_STATES];
+// theta_desA[0] = PI;
+// theta_desB[0] = PI;
 // int num_of_pos = 1;
 
 float theta_desA = PI; // rad (PI by default)
@@ -211,18 +213,15 @@ void waitForUserStart() {
         Serial.println("Input Y detected.");
         if (calibrated) 
         {
-
-          // TODO: Make the code work with multiple (array/vector). Need to rework the code to use malloc and realloc
-          // Requires adjustments with how to use theta_des to be a float pointer instead of a float
-
           // // Prompt user for how many positions and to set positions
           // Serial.println("\n==============================================");
-          // Serial.println("How many positions do you want? (Type an integer)");
+          // Serial.print("How many positions do you want? (Type an integer between 1 and ");
+          // Serial.print(MAX_STATES);
+          // Serial.println(")");
           // Serial.println("==============================================");
 
           // num_of_pos = Serial.parseInt();
-          // theta_desA = (float*) realloc(theta_desA, num_of_pos * sizeof(float));
-          // theta_desB = (float*) realloc(theta_desB, num_of_pos * sizeof(float));
+          // num_of_pos = constrain(num_of_pos, 1, MAX_STATES);
 
           // for (int i = 0; i < num_of_pos; i++) {
           // set_theta_des(theta_desA[i], maxTheta1, i);
@@ -287,13 +286,14 @@ void keyPress()
 
     // // Prompt user for how many positions and to set positions
     // Serial.println("\n==============================================");
-    // Serial.println("How many positions do you want? (Type an integer)");
+    // Serial.print("How many positions do you want? (Type an integer between 1 and ");
+    // Serial.print(MAX_STATES);
+    // Serial.println(")");
     // Serial.println("==============================================");
 
     // num_of_pos = Serial.parseInt();
-    // theta_desA = (float *) realloc(theta_desA, num_of_pos * sizeof(float));
-    // theta_desB = (float *) realloc(theta_desB, num_of_pos * sizeof(float));
-    // num_of_pos = num_of_pos;
+    // num_of_pos = constrain(num_of_pos, 1, MAX_STATES);
+
     // for (int i = 0; i < num_of_pos; i++){
     //   set_theta_des(theta_desA[i], maxTheta1, i);
     //   set_theta_des(theta_desB[i], maxTheta2, i);
@@ -444,8 +444,6 @@ float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, 
 void setup()
 {
   // Setup default vals for theta_des
-  // theta_desA = (float *) malloc(sizeof(float));
-  // theta_desB = (float *) malloc(sizeof(float));
   // *theta_desA = PI;
   // *theta_desB = PI;
 
@@ -585,6 +583,7 @@ void loop()
     else 
     {
       md.setSpeed(0);
+      md2.setSpeed(0);
     }
     
     // Print at lower rate to avoid slowing control loop
