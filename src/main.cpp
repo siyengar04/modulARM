@@ -461,7 +461,9 @@ void loop()
     if(fabs(theta_desB[completed] - theta_measB) <= 0.05) 
     {
         if (completed < num_of_pos - 1){
+          e_intB = 0.0;
           completed++;
+          e_prevB = theta_desB[completed] - theta_measB;
         }
     }  
 
@@ -481,9 +483,9 @@ void loop()
       Serial.print(omega_measB, 4);
       Serial.print(",");
       Serial.println(u_satB, 2);
-      Serial.print("\n");
       Serial.print("State: ");
       Serial.println(completed);
+      Serial.print("\n");
 
       printCounter = 0;
     }
