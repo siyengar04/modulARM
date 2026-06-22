@@ -108,7 +108,6 @@ void set_theta_des(float &theta_des, float maxTheta, int pos)  {
   Serial.println("==============================================");
   Serial.print("Enter desired position in radians (0.00 to ");
   Serial.print(maxTheta, 2);
-  // Serial.println("):");       //comment out when switching to array
   Serial.print(") ");
   Serial.print("for position ");
   Serial.print(pos);
@@ -166,12 +165,22 @@ void waitForUserStart() {
 
           completed = 0;
 
+          Serial.println("All states are the following: ");
+          Serial.print("[");
+          for (int i = 0; i < num_of_pos - 1; i++) {
+            Serial.print(theta_desB[i]);
+            Serial.print(", ");
+          }
+          Serial.print(theta_desB[num_of_pos-1]);
+          Serial.println("]");
+
           Serial.println("----------------------------------------------");
           Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
           Serial.println("----------------------------------------------");
 
           delay(10);
-          while (Serial.available() > 0 && Serial.peek() != '\n') { Serial.read(); }
+          while (Serial.available() > 0) { Serial.read(); }
+
           while (true) 
           {
             if (Serial.available() > 0) 
