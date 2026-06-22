@@ -2,8 +2,8 @@
 
 // Driver config
 //driver 2 TODO
-const uint8_t MD_DIR2 = 5;
-const uint8_t MD_PWM2 = 12;
+const uint8_t MD_DIR2 = 7;//5;  //7
+const uint8_t MD_PWM2 = 2;//12; //2
 const uint8_t MD_SLP2 = 4;
 const uint8_t MD_FLT2 = 30;
 const uint8_t MD_CS2 = A1;
@@ -127,10 +127,9 @@ void set_theta_des(float &theta_des, float maxTheta, int pos)  {
   Serial.print("Target position successfully set to: "); //comment out when switching to array
   Serial.println(theta_des, 4);
 
+  return;
   while (Serial.available() && Serial.peek() != '\n')
     Serial.read(); // Clear buffer
-  return;
-  
 }
 
 void waitForUserStart() {
@@ -243,6 +242,15 @@ void keyPress()
     }
 
     completed = 0;
+
+    Serial.println("All states are the following: ");
+    Serial.print("[");
+    for (int i = 0; i < num_of_pos - 1; i++) {
+      Serial.print(theta_desB[i]);
+      Serial.print(", ");
+    }
+    Serial.print(theta_desB[num_of_pos-1]);
+    Serial.println("]");
 
     Serial.println("----------------------------------------------");
     Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
@@ -363,7 +371,7 @@ float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, 
     return 0;
   }
   // Boundary check
-  if (((theta_meas >= maxTheta) && u_sat > 0) || (theta_meas <= 0.14 && u_sat < 0))  
+  if (((theta_meas >= maxTheta) && u_sat > 0) || (theta_meas <= 0.05 && u_sat < 0))  
   {
     return 0;
   }
