@@ -482,6 +482,8 @@ void loop()
       Serial.print(",");
       Serial.println(u_satB, 2);
       Serial.print("\n");
+      Serial.print("State: ");
+      Serial.println(completed);
 
       printCounter = 0;
     }
