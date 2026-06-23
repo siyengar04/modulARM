@@ -51,6 +51,8 @@ float theta_desB[MAX_STATES];
 int num_of_pos = 1;
 
 int completed = 0;
+int break_between_des = 50;
+int break_counter = 0;
 
 // ===================== PID STATES =====================
 float e_intB = 0.0;
@@ -363,6 +365,9 @@ float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, 
   
   // if (((currentB / 2800) >= maxCurrent) && (omega_measB <= 3))
   // {
+  //   Serial.println("Surpassed chosen current limit. Stopping...");
+  //   Serial.print("Current Draw at trip: ");
+  //   Serial.println(currentB);
   //   return 0;
   // }
   if (digitalRead(limitSwitchPinB1) == LOW) 
@@ -468,16 +473,44 @@ void loop()
 
     if(fabs(theta_desB[completed] - theta_measB) <= 0.05) 
     {
+      int delay = 300;
         if (completed < num_of_pos - 1){
+          Serial.print("State ");
+          Serial.print(completed);
+          Serial.println(" completed.");
           e_intB = 0.0;
+          md2.setSpeed(0);
           completed++;
           e_prevB = theta_desB[completed] - theta_measB;
+          for (int i = 0; i < delay; i++)
+          {
+            Serial.print("Now delaying ");
+            Serial.print(i);
+            Serial.print("/");
+            Serial.println(delay);
+          }
+          // break_counter++;
         }
     }  
 
+    // if (break_counter < break_between_des && break_counter > 0)
+    // {
+    //   break_counter++;
+    // }
+
+    // if (break_counter == break_between_des)
+    // {
+    //   break_counter = 0;
+    // }
+    
     float u_satB = calculatePID(theta_desB[completed], theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
+
     setMotorCommandB(u_satB);
 
+    // if (break_counter == 0)
+    // {
+    //   setMotorCommandB(u_satB);
+    // }
     
     // Print at lower rate to avoid slowing control loop
     printCounter++;
