@@ -48,11 +48,9 @@ float KdB = 2.0;
 
 const int MAX_STATES = 10;     // max allowed number of states
 float theta_desB[MAX_STATES];
-int num_of_pos = 1;
+int num_of_pos = 1;            // Desired number of states
 
-int completed = 0;
-int break_between_des = 50;
-int break_counter = 0;
+int completed = 0;             // Tracks current state
 
 // ===================== PID STATES =====================
 float e_intB = 0.0;
@@ -99,6 +97,7 @@ void doEncoderD()
 
 void doLimit2()
 {
+  // Stops motor and triggers flag to stop all operation on the next loop
   md2.setSpeed(0);
   systemLock = true;
 }
@@ -106,7 +105,7 @@ void doLimit2()
 // ===================== USER INPUT FUNCTIONS =====================  //ONLY HANDLES ONE MOTOR
 
 void set_theta_des(float &theta_des, float maxTheta, int pos)  {
-  //Prompt User
+  //Prompt User for desired position
   Serial.println("==============================================");
   Serial.print("Enter desired position in radians (0.00 to ");
   Serial.print(maxTheta, 2);
@@ -116,8 +115,8 @@ void set_theta_des(float &theta_des, float maxTheta, int pos)  {
   Serial.println(":");
   Serial.println("==============================================");
 
+  // Reads user input (float)
   Serial.setTimeout(10000);
-
   float new_theta = Serial.parseFloat();
 
   theta_des = constrain(new_theta, home, maxTheta);
@@ -130,11 +129,10 @@ void set_theta_des(float &theta_des, float maxTheta, int pos)  {
   Serial.println(theta_des, 4);
 
   return;
-  while (Serial.available() && Serial.peek() != '\n')
-    Serial.read(); // Clear buffer
 }
 
 void waitForUserStart() {
+  // Prompt user to start current process
   Serial.println("\n==============================================");
   Serial.println("Do you want it to start? (Y/N)");
   Serial.println("==============================================");
@@ -148,24 +146,27 @@ void waitForUserStart() {
         Serial.println("Input Y detected.");
         if (calibrated) 
         {
-          
-          // Prompt user for how many positions and to set positions
+          // If not for calibration, asks user to set up the states for the program
+          // Prompt user for how many positions
           Serial.println("\n==============================================");
           Serial.print("How many positions do you want? (Type an integer between 1 and ");
           Serial.print(MAX_STATES);
           Serial.println(")");
           Serial.println("==============================================");
-
+          
+          // Reads user input (int)
           Serial.setTimeout(10000);
           num_of_pos = Serial.parseInt();
           num_of_pos = constrain(num_of_pos, 1, MAX_STATES);
-
+          
+          // Prompt user to set the position for the desired number of states
           for (int i = 0; i < num_of_pos; i++) {
           set_theta_des(theta_desB[i], maxTheta2, i);
           }
 
           completed = 0;
 
+          // Prints an array with all of the states for visual confirmation
           Serial.println("All states are the following: ");
           Serial.print("[");
           for (int i = 0; i < num_of_pos - 1; i++) {
@@ -174,14 +175,18 @@ void waitForUserStart() {
           }
           Serial.print(theta_desB[num_of_pos-1]);
           Serial.println("]");
-
+          
+          // Waits for user to actually start the program
+          // Allows for wait time between setup and operation
           Serial.println("----------------------------------------------");
           Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
           Serial.println("----------------------------------------------");
 
+          // Clear serial buffer
           delay(10);
           while (Serial.available() > 0) { Serial.read(); }
 
+          // Checks for ENTER key
           while (true) 
           {
             if (Serial.available() > 0) 
@@ -193,6 +198,7 @@ void waitForUserStart() {
             }
           }
 
+          // Clears buffer
           delay(10);
           while (Serial.available() > 0) { Serial.read(); }
           
@@ -222,6 +228,7 @@ void keyPress()
 {
   if (Serial.available() > 0) 
   {
+    // Deactivates motor while setting up new states for safety
     md2.setSpeed(0);
     md2.Sleep();
 
@@ -232,19 +239,24 @@ void keyPress()
     Serial.println(")");
     Serial.println("==============================================");
 
+    // Reads user input (int)
     Serial.setTimeout(10000);
-
     num_of_pos = Serial.parseInt();
     num_of_pos = constrain(num_of_pos, 1, MAX_STATES);
+
+    // Print confirmation
     Serial.print("Number of positions set to: ");
     Serial.println(num_of_pos);
 
+    // Makes user choose the positions for the desired number of states
     for (int i = 0; i < num_of_pos; i++){
       set_theta_des(theta_desB[i], maxTheta2, i);
     }
 
+    // Reset to do proper counting of current state
     completed = 0;
 
+    // Prints array with state positions for visual confirmation
     Serial.println("All states are the following: ");
     Serial.print("[");
     for (int i = 0; i < num_of_pos - 1; i++) {
@@ -254,12 +266,16 @@ void keyPress()
     Serial.print(theta_desB[num_of_pos-1]);
     Serial.println("]");
 
+    // Require user input to start the program again
     Serial.println("----------------------------------------------");
     Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
     Serial.println("----------------------------------------------");
 
+    // Clear Serial buffer
     delay(10);
     while (Serial.available() > 0) { Serial.read(); }
+
+    // Waits for user to hit ENTER
     while (true) 
     {
       if (Serial.available() > 0) 
@@ -271,18 +287,21 @@ void keyPress()
       }
     }
 
+    // CLear buffer
     delay(10);
     while (Serial.available() > 0) { Serial.read(); }
     
     Serial.println("Motor engaged! Starting control loop...");
-
+    // Reset integral value for the new state
     e_intB = 0.0;
     
+    // Read encoder to setup for new state
     unsigned long now_pre = micros();
     float dt_pre = (now_pre - lastControlMicros) * 1e-6;
     if (dt_pre <= 0) dt_pre = 0.002; 
     readEncoderState(dt_pre, encoderCountB, prevCountB, theta_measB, omega_measB);
     
+    // Prevents sudden jerking movement I think (may not be necessary)
     e_prevB = theta_desB[0] - theta_measB;
 
     md2.Wake();
@@ -360,21 +379,12 @@ float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, 
     e_int = constrain(e_int, -eIntMax, eIntMax);
   }
 
-  //Current Sense stuff
-  // float currentB = md2.getCurrentMilliamps();
-  
-  // if (((currentB / 2800) >= maxCurrent) && (omega_measB <= 3))
-  // {
-  //   Serial.println("Surpassed chosen current limit. Stopping...");
-  //   Serial.print("Current Draw at trip: ");
-  //   Serial.println(currentB);
-  //   return 0;
-  // }
   if (digitalRead(limitSwitchPinB1) == LOW) 
   {
     systemLock = true;
     return 0;
   }
+
   // Boundary check
   if (((theta_meas >= maxTheta) && u_sat > 0) || (theta_meas <= 0.05 && u_sat < 0))  
   {
@@ -395,9 +405,11 @@ void setup()
   pinMode(limitSwitchPinB2, INPUT_PULLUP);
   pinMode(limitSwitchPinB1, INPUT_PULLUP);
 
+  // Setup encoders to be read properly
   attachInterrupt(digitalPinToInterrupt(encoderBPinA), doEncoderC, CHANGE);
   attachInterrupt(digitalPinToInterrupt(encoderBPinB), doEncoderD, CHANGE);
 
+  // Sets default PID theta_des to PI if something goes wrong with user input
   theta_desB[0] = PI;
 
   md2.init();
@@ -412,26 +424,20 @@ void setup()
   md2.Wake();
   delay(10);
   // Calibrate current sensor at zero command
-  // analogReference(INTERNAL1V1);
-  Serial.print("Current Offset: ");
-  Serial.println(md2.getCurrentReading());
-  waitForUserStart();
   md2.calibrateCurrentOffset();
-  Serial.print("After Calibration: ");
-  Serial.println(md2.getCurrentMilliamps());
   delay(10);
 
   lastControlMicros = micros();
 
   Serial.println("Homing motor B...");
   
+  // Homing loop
   do {
-    Serial.print("Current Draw: ");
-    Serial.println(md2.getCurrentMilliamps()); //* (1100000 / 5000000));
     md2.setSpeed(-200);
     delay(100);
   } while (digitalRead(limitSwitchPinB2) == HIGH);
 
+  // Initializes values after homing
   md2.setSpeed(0);
   encoderCountB = 0;
   theta_measB = 0.0;
@@ -447,10 +453,10 @@ void setup()
   md2.Wake();
   md2.setSpeed(0);
 
-  #if defined(__AVR_ATmega2560__)
-    EIFR = bit(INTF0) | bit(INTF1); 
-  #endif
+  // Resets interrupt triggers 0 and 1 (they're triggered during homing but not deactivated)
+  EIFR = bit(INTF0) | bit(INTF1); 
 
+  // Attach interrupt for limit switch safety feature
   attachInterrupt(digitalPinToInterrupt(limitSwitchPinB2), doLimit2, FALLING);
 
   lastControlMicros = micros();
@@ -470,6 +476,7 @@ void loop()
     while (true) { }
   }
 
+  // Checks for user input
   keyPress();
 
   unsigned long now = micros();
@@ -481,17 +488,26 @@ void loop()
     readEncoderState(dt, encoderCountB, prevCountB, theta_measB, omega_measB);
     stopIfFault();
 
+    // If close enough to current state, move onto new state
+    // Threshold is currently arbitrary. Need to check and fine tune
     if(fabs(theta_desB[completed] - theta_measB) <= 0.05) 
     {
       int delay = 300;
+        // Increment PID and tells user
         if (completed < num_of_pos - 1){
           Serial.print("State ");
           Serial.print(completed);
           Serial.println(" completed.");
+          
+          // stops motor and resets integral error for next position
           e_intB = 0.0;
           md2.setSpeed(0);
           completed++;
+
+          // If delay is too short, prevents current spike from braking by forcing error of next iteration to be 0;
           e_prevB = theta_desB[completed] - theta_measB;
+
+          // Tells user about delay and delay progress
           for (int i = 0; i < delay; i++)
           {
             Serial.print("Now delaying ");
@@ -499,28 +515,13 @@ void loop()
             Serial.print("/");
             Serial.println(delay);
           }
-          // break_counter++;
         }
     }  
-
-    // if (break_counter < break_between_des && break_counter > 0)
-    // {
-    //   break_counter++;
-    // }
-
-    // if (break_counter == break_between_des)
-    // {
-    //   break_counter = 0;
-    // }
     
+    // Calculate PID and control motor
     float u_satB = calculatePID(theta_desB[completed], theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
-
     setMotorCommandB(u_satB);
 
-    // if (break_counter == 0)
-    // {
-    //   setMotorCommandB(u_satB);
-    // }
     // Print at lower rate to avoid slowing control loop
     printCounter++;
     if (printCounter >= printEvery)
