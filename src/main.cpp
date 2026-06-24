@@ -19,7 +19,7 @@ const float maxCurrent = 0.6;
 volatile bool calibrated = false;
 volatile bool systemLock = false;
 
-G2MotorDriver24v13 md2(MD_DIR2, MD_PWM2, MD_SLP2, MD_FLT2, MD_CS2);
+G2MotorDriver18v17 md2(MD_DIR2, MD_PWM2, MD_SLP2, MD_FLT2, MD_CS2);
 
 const uint8_t encoderBPinA = 18;
 const uint8_t encoderBPinB = 19;
@@ -412,16 +412,26 @@ void setup()
   md2.Wake();
   delay(10);
   // Calibrate current sensor at zero command
+  // analogReference(INTERNAL1V1);
+  Serial.print("Current Offset: ");
+  Serial.println(md2.getCurrentReading());
+  waitForUserStart();
   md2.calibrateCurrentOffset();
+  Serial.print("After Calibration: ");
+  Serial.println(md2.getCurrentMilliamps());
   delay(10);
 
   lastControlMicros = micros();
 
   Serial.println("Homing motor B...");
+  
   do {
+    Serial.print("Current Draw: ");
+    Serial.println(md2.getCurrentMilliamps()); //* (1100000 / 5000000));
     md2.setSpeed(-200);
     delay(100);
   } while (digitalRead(limitSwitchPinB2) == HIGH);
+
   md2.setSpeed(0);
   encoderCountB = 0;
   theta_measB = 0.0;
@@ -511,7 +521,6 @@ void loop()
     // {
     //   setMotorCommandB(u_satB);
     // }
-    
     // Print at lower rate to avoid slowing control loop
     printCounter++;
     if (printCounter >= printEvery)
