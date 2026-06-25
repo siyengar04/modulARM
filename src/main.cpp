@@ -1,4 +1,4 @@
-#include "G2MotorDriver.h"
+#include "Modified_G2MotorDriver.h"
 
 // Driver config
 //driver 2 TODO
@@ -452,8 +452,7 @@ void setup()
   
   // Homing loop
   do {
-    md2.setSpeed(-200);
-    // OCR3B = 200;
+    md2.setSpeed(-50);
   } while (digitalRead(limitSwitchPinB2) == HIGH);
 
   // Initializes values after homing
