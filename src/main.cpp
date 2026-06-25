@@ -2,37 +2,42 @@
 #include "G2MotorDriver.h"
 // #include "avr8-stub.h"
 
-// driver 2
-const uint8_t MD_DIR2 = 5;
-const uint8_t MD_PWM2 = 12;
+// driver 2 pins
+const uint8_t MD_DIR2 = 7;
+const uint8_t MD_PWM2 = 2;
 const uint8_t MD_SLP2 = 4;
 const uint8_t MD_FLT2 = 30;
 const uint8_t MD_CS2 = A1;
 
+// Limit switch pins
+const uint8_t limitSwitchPin2B = 20;
+const uint8_t limitSwitchPin2A = 8;
+
 // instantiate motor driver
-G2MotorDriver24v13 md2(MD_DIR2, MD_PWM2, MD_SLP2, MD_FLT2, MD_CS2);
+G2MotorDriver18v17 md2(MD_DIR2, MD_PWM2, MD_SLP2, MD_FLT2, MD_CS2);
 
 // initialize encoder
-const uint8_t encoder2PinA = 18;
-const uint8_t encoder2PinB = 19;
+volatile int encoderPosition = 0;
+const uint8_t encoder2PinA = 19;
+const uint8_t encoder2PinB = 18;
 volatile float encoderAngleB = 0.0;
-volatile int encoderCountB = 0;
+volatile int encoderCount2 = 0;
 float previousBAngle = 0.0;
 float encoderBAngle = 0.0;
 float encoderBSpeed = 0.0;
-
-// Limit switch pins
-const uint8_t limitSwitchPinB2 = 20;
-const uint8_t limitSwitchPinB1 = 8;
+float currentSpeed = 0.0;
+long lastSpeedTime = 0;
+int lastEncoderPosition = 0;
 
 // motor variables
-const float maxTheta2 = 3;
+const float maxTheta2 = 180.0;
 const float home = 0.0;
 const float maxCurrent = 0.6;
 
 // system variables
 volatile bool calibrated = false;
 volatile bool systemLock = false;
+unsigned long now = micros();
 
 const float gearRatio = 270.0;
 const float countsPerMotorRev = 64.0;
@@ -43,55 +48,79 @@ const unsigned long controlPeriodMicros = 2000; // mus = 500 Hz
 unsigned long lastControlMicros = 0;
 
 // ===================== PID GAINS =====================
-// motor B
-float KpB = 500.0;
-float KiB = 300.0;
-float KdB = 2.0;
+// // motor 2 testing
+// float Kp2 = 500.0;
+// float Ki2 = 300.0;
+// float Kd2 = 2.0;
+
+float Kp2 = 200.0;
+float Ki2 = 50.0;
+float Kd2 = 2.0;
 
 // ===================== SETPOINT =====================
-float theta_desB = PI;
+float thetaDes2 = 0.0;
 
 // ===================== PID STATES =====================
-float e_intB = 0.0;
-float e_prevB = 0.0;
+float e_int2 = 0.0;
+float e_prev2 = 0.0;
 
 // Integral anti-windup limit
-const float eIntMax = 50.0;
+const float eIntMax2 = 50.0;
 
 // ===================== MEASURED STATES =====================
-float theta_measB = 0.0;
-float omega_measB = 0.0;
+float thetaMeas2 = 0.0;
+float omegaMeas2 = 0.0;
 
-long prevCountB = 0;
+long prevCount2 = 0;
 
 // ===================== SERIAL PRINTING =====================
 int printCounter = 0;
 const int printEvery = 150; // print every 150 control loops = 100 Hz
-
+float rad2Deg(float rad)
+{
+  return rad * (180.0 / PI);
+}
 // ==========================  Prototypes  ================================
-// void readEncoderState(float dt, volatile long &encoderCount, long &prevCount, float &theta_meas, float &omega_meas);
+// void readEncoderState(float dt2, volatile long &encoderCount, long &prevCount, float &thetaMeas2, float &omega_meas);
 
 // handle interrupts for reading encoders and limit switches
-void doEncoderC()
+void doEncoder2A()
 {
   bool A = digitalRead(encoder2PinA);
   bool B = digitalRead(encoder2PinB);
 
   if (A == B)
-    encoderCountB++;
+    encoderCount2++;
   else
-    encoderCountB--;
+    encoderCount2--;
 }
 
-void doEncoderD()
+void doEncoder2B()
 {
   bool A = digitalRead(encoder2PinA);
   bool B = digitalRead(encoder2PinB);
 
   if (A == B)
-    encoderCountB++;
+    encoderCount2--;
   else
-    encoderCountB--;
+    encoderCount2++;
+}
+
+void readEncoderState(float dt)
+{
+  long count;
+
+  noInterrupts();
+  count = encoderCount2;
+  interrupts();
+
+  thetaMeas2 = rad2Deg(count * 2.0 * PI / countsPerOutputRev);
+  // thetaMeas2 = 180.0 * count * 2.0 / countsPerOutputRev;
+
+  long dCount = count - prevCount2;
+  omegaMeas2 = dCount * 2.0 * PI / (countsPerOutputRev * dt);
+
+  prevCount2 = count;
 }
 
 void doLimit2()
@@ -99,31 +128,41 @@ void doLimit2()
   md2.setSpeed(0);
   systemLock = true;
 }
+// void calcSpeed(float dt)
+// {
 
+//   unsigned long currentTime = millis();
+
+//   if (dt >= 10) // Calculate speed every 10ms for PID input freshness
+//   {
+//     long deltaPulses = encoderPosition - lastEncoderPosition;
+//     float deltaAngle = (deltaPulses * 360.0) / pulsesPerRevolution;
+//     currentSpeed = (deltaAngle * 1000.0) / dt;
+//     lastEncoderPosition = encoderPosition;
+//     lastSpeedTime = currentTime;
+//   }
+// }
 // accept user input
-void set_theta_des(float &theta_des, float maxTheta)
+void set_theta_des()
 {
 
   // Prompt User
   Serial.println("==============================================");
-  Serial.print("Enter desired position in radians (0.00 to ");
-  Serial.print(maxTheta, 2);
+  Serial.print("Enter desired position in degrees (0.00 to ");
+  Serial.print(maxTheta2, 2);
   Serial.println("):");
   Serial.println("==============================================");
 
   Serial.setTimeout(10000);
 
-  float new_theta = Serial.parseFloat();
-
-  theta_des = constrain(new_theta, home, maxTheta);
-
-  // 8. Print confirmation
+  float new_theta2 = Serial.parseFloat();
+  thetaDes2 = constrain(new_theta2, home, maxTheta2);
   Serial.print("Target position successfully set to: ");
-  Serial.println(theta_des, 4);
-
-  return;
+  Serial.println(thetaDes2, 4);
   while (Serial.available() && Serial.peek() != '\n')
     Serial.read(); // Clear buffer
+
+  return;
 }
 
 void waitForUserStart()
@@ -144,7 +183,7 @@ void waitForUserStart()
         Serial.println("Input Y detected.");
         if (calibrated)
         {
-          set_theta_des(theta_desB, maxTheta2);
+          set_theta_des();
 
           Serial.println("----------------------------------------------");
           Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
@@ -205,7 +244,7 @@ void keyPress()
     md2.setSpeed(0);
     md2.Sleep();
 
-    set_theta_des(theta_desB, maxTheta2);
+    set_theta_des();
 
     Serial.println("----------------------------------------------");
     Serial.println(">>> Press ENTER again to engage the PID motor loop <<<");
@@ -236,53 +275,45 @@ void keyPress()
 
     Serial.println("Motor engaged! Starting control loop...");
 
-    e_intB = 0.0;
+    // e_int2 = 0.0;
 
-    unsigned long now_pre = micros();
-    float dt_pre = (now_pre - lastControlMicros) * 1e-6;
-    if (dt_pre <= 0)
-      dt_pre = 0.002;
+    // unsigned long now_pre = micros();
+    // float dt_pre = (now_pre - lastControlMicros) * 1e-6;
+    // if (dt_pre <= 0)
+    //   dt_pre = 0.002;
 
-    e_prevB = theta_desB - theta_measB;
+    // e_prev2 = thetaDes2 - thetaMeas2;
 
     md2.Wake();
-    lastControlMicros = micros();
+    // lastControlMicros = micros();
   }
 }
 
 // stop for fault, currently unassigned
-void stopIfFault()
-{
-  if (md2.getFault())
-  {
-
-    md2.setSpeed(0);
-    md2.Sleep();
-
-    Serial.println("Motor driver fault detected. Driver disabled.");
-
-    while (1)
-    {
-      delay(100);
-    }
-  }
-}
+// void stopIfFault()
+// {
+//   if (md2.getFault())
+//   {
+//     md2.setSpeed(0);
+//     md2.Sleep();
+//     Serial.println("Motor driver fault detected. Driver disabled.");
+//     while (1)
+//     {
+//       delay(100);
+//     }
+//   }
+// }
 
 // ===================== MOTOR COMMAND =====================
-void setMotorCommandB(float u)
+void setMotorCommand2(float u)
 {
-  int u_cmd = (int)constrain(u, -400.0, 400.0);
+  int u_cmd = (int)constrain(u, -50.0, 50.0);
   md2.setSpeed(u_cmd);
 }
 
 // ===================== READ ENCODER =====================
 
-float getCurrentAngle()
-{
-  theta_measB = fmod((encoderCountB * 360.0) / countsPerOutputRev + 360.0, 360.0);
-  return theta_measB;
-}
-// void readEncoderState(float dt, volatile long &encoderCount, long &prevCount, float &theta_meas, float &omega_meas)
+// void readEncoderState(float dt2, volatile long &encoderCount, long &prevCount, float &thetaMeas2, float &omega_meas)
 // {
 
 //   long count;
@@ -291,40 +322,44 @@ float getCurrentAngle()
 //   count = encoderCount;
 //   interrupts();
 
-//   theta_meas = count * 2.0 * PI / countsPerOutputRev;
+//   thetaMeas2 = count * 2.0 * PI / countsPerOutputRev;
 
 //   long dCount = count - prevCount;
-//   omega_meas = dCount * 2.0 * PI / (countsPerOutputRev * dt);
+//   omega_meas = dCount * 2.0 * PI / (countsPerOutputRev * dt2);
 
 //   prevCount = count;
 // }
 
 // ==================== PID Function ========================= Made separate for ease of use between motors
-float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, float &e_int, float &e_prev, float Kp, float Ki, float Kd)
+float calculatePID(float Kp, float Ki, float Kd, float dt)
 {
-  // math allows angle to reset to zero (modulus) while accounting for RPM
-  encoderBAngle = fmod((encoderCountB * 360.0) / 17280.0 + 360.0, 360.0);
-  theta_meas = encoderBAngle;
+
+  // calcSpeed();
   // Position error
-  float e = theta_des - theta_meas;
+  float e = thetaDes2 - thetaMeas2;
+  // error wrapping
+  // if (e > 180)
+  //   e -= 360;
+  // if (e < -180)
+  //   e += 360;
   // Integral term with anti-windup clamp
-  e_int += e * dt;
-  e_int = constrain(e_int, -eIntMax, eIntMax);
+  e_int2 += e * dt;
+  e_int2 = constrain(e_int2, -eIntMax2, eIntMax2);
 
   // Derivative term:
-  float e_dot = (e - e_prev) / dt;
-  e_prev = e;
+  float e_dot2 = (e - e_prev2) / dt;
+  e_prev2 = e;
 
-  float u = Kp * e + Ki * e_int + Kd * e_dot;
+  float u = Kp * e + Ki * e_int2 + Kd * e_dot2;
 
   // Saturate command
-  float u_sat = constrain(u, -400.0, 400.0);
+  float u_sat = constrain(u, -50.0, 50.0);
 
   // Extra anti-windup: stop integrating if saturated in the same direction
   if ((u != u_sat) && ((e > 0 && u > 0) || (e < 0 && u < 0)))
   {
-    e_int -= e * dt;
-    e_int = constrain(e_int, -eIntMax, eIntMax);
+    e_int2 -= e * dt;
+    e_int2 = constrain(e_int2, -eIntMax2, eIntMax2);
   }
 
   // Current Sense stuff
@@ -334,13 +369,13 @@ float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, 
   // {
   //   return 0;
   // }
-  if (digitalRead(limitSwitchPinB1) == LOW)
+  if (digitalRead(limitSwitchPin2A) == LOW)
   {
     systemLock = true;
     return 0;
   }
   // Boundary check
-  if (((theta_meas >= maxTheta) && u_sat > 0) || (theta_meas <= 0.14 && u_sat < 0))
+  if (((thetaMeas2 >= maxTheta2) && u_sat > 0) || (thetaMeas2 <= 0.14 && u_sat < 0))
   {
     return 0;
   }
@@ -351,17 +386,19 @@ float calculatePID(float theta_des, float theta_meas, float maxTheta, float dt, 
 // ===================== SETUP =====================
 void setup()
 {
+  lastSpeedTime = millis();
+  lastEncoderPosition = encoderPosition;
   // debug_init();
   Serial.begin(115200);
   // to prevent motor kick on startup write PWM to low before starting the driver
   digitalWrite(MD_PWM2, LOW);
   pinMode(encoder2PinA, INPUT_PULLUP);
   pinMode(encoder2PinB, INPUT_PULLUP);
-  pinMode(limitSwitchPinB2, INPUT_PULLUP);
-  pinMode(limitSwitchPinB1, INPUT_PULLUP);
+  pinMode(limitSwitchPin2B, INPUT_PULLUP);
+  pinMode(limitSwitchPin2A, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(encoder2PinA), doEncoderC, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(encoder2PinB), doEncoderD, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(encoder2PinA), doEncoder2A, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(encoder2PinB), doEncoder2B, CHANGE);
 
   md2.init();
   // Keep motor driver disabled during startup
@@ -383,14 +420,14 @@ void setup()
   Serial.println("Homing motor B...");
   do
   {
-    md2.setSpeed(-100);
-    delay(100);
-  } while (digitalRead(limitSwitchPinB2) == HIGH);
+    md2.setSpeed(-50);
+    // delay(100);
+  } while (digitalRead(limitSwitchPin2B) == HIGH);
   md2.setSpeed(0);
-  encoderCountB = 0;
-  theta_measB = 0.0;
-  e_intB = 0.0;
-  e_prevB = 0.0;
+  encoderCount2 = 0;
+  thetaMeas2 = 0.0;
+  e_int2 = 0.0;
+  e_prev2 = 0.0;
   calibrated = true;
   Serial.println("Homing complete.");
 
@@ -405,7 +442,7 @@ void setup()
   EIFR = bit(INTF0) | bit(INTF1);
 #endif
 
-  attachInterrupt(digitalPinToInterrupt(limitSwitchPinB2), doLimit2, FALLING);
+  attachInterrupt(digitalPinToInterrupt(limitSwitchPin2B), doLimit2, FALLING);
 
   lastControlMicros = micros();
 }
@@ -429,30 +466,34 @@ void loop()
   keyPress();
 
   unsigned long now = micros();
+
   if ((unsigned long)(now - lastControlMicros) >= controlPeriodMicros)
   {
     float dt = (now - lastControlMicros) * 1e-6;
     lastControlMicros = now;
+    readEncoderState(dt);
 
     // stopIfFault();
-
-    float u_satB = calculatePID(theta_desB, theta_measB, maxTheta2, dt, e_intB, e_prevB, KpB, KiB, KdB);
-    setMotorCommandB(u_satB);
+    // calcSpeed(dt);
+    float u_sat2 = calculatePID(Kp2, Ki2, Kd2, dt);
+    setMotorCommand2(u_sat2);
 
     // Print at lower rate to avoid slowing control loop
     printCounter++;
     if (printCounter >= printEvery)
     {
-      Serial.println("MotorB:");
-      Serial.print(theta_desB, 4);
+      printCounter = 0;
+
+      Serial.println("Motor2:");
+      Serial.print(thetaDes2, 4);
       Serial.print(",");
-      Serial.print(theta_measB, 4);
+      Serial.print(thetaMeas2, 4);
       Serial.print(",");
-      Serial.print(omega_measB, 4);
+      Serial.print(omegaMeas2, 4);
       Serial.print(",");
-      Serial.println(u_satB, 2);
+      Serial.println(u_sat2, 2);
       Serial.print("Raw Encoder Count: ");
-      Serial.print(encoderCountB);
+      Serial.print(encoderCount2);
       Serial.print("\n");
     }
   }
