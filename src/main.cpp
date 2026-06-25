@@ -407,8 +407,8 @@ void setup()
   // Basically copy pasted the one in library  for timer 1
   // TCCR assignments are the waveform generator settings, should be ok to copy
   // ICR assignment sets the TOP value like in the motor driver
-  // TCCR3A = 0b10100000;
-  // TCCR3B = 0b00010001;
+  // TCCR3A = 0b10101000;
+  // TCCR3B = 0b00010001;    
   // ICR3 = 400;
   // ===============================================================================
   
@@ -443,11 +443,17 @@ void setup()
 
   lastControlMicros = micros();
 
+  // pinMode(2, OUTPUT);
+  // TCCR3A = 0b10101000;
+  // TCCR3B = 0b00010001;    
+  // ICR3 = 400;
+
   Serial.println("Homing motor B...");
   
   // Homing loop
   do {
-    md2.setSpeed(-50);
+    md2.setSpeed(-200);
+    // OCR3B = 200;
   } while (digitalRead(limitSwitchPinB2) == HIGH);
 
   // Initializes values after homing

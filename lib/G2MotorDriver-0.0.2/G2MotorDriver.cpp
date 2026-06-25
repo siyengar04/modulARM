@@ -44,25 +44,37 @@ void G2MotorDriver::init()
     pinMode(_FLTPin, INPUT_PULLUP); // Output is driven low when a fault has occurred INPUT_PULLUP where HIGH means the sensor is off, and LOW means the sensor is on
     pinMode(_CSPin, INPUT);
 
+    Serial.println("init called");
+
     // Set the frequency for timer1.
-    #ifdef G2MOTORDRIVER_TIMER1_AVAILABLE
-    if (_PWMPin == _PWM_TIMER1_PIN_A || _PWMPin == _PWM_TIMER1_PIN_B)
+    // #ifdef G2MOTORDRIVER_TIMER1_AVAILABLE
+    // if (_PWMPin == _PWM_TIMER1_PIN_A || _PWMPin == _PWM_TIMER1_PIN_B)
+    // {
+    //     /**
+    //      * Timer 1 Phase-Correct PWM configuration
+    //      * prescaler: clockI/O / 1
+    //      * outputs enabled
+    //      * phase-correct PWM
+    //      * top of 400
+    //      * 
+    //      * PWM frequency calculation
+    //      * 16MHz / 1 (prescaler) / 2 (phase-correct) / 400 (top) = ~20kHz
+    //      *
+    //      * The Timer/Counter Control Registers TCCRnA and TCCRnB hold the main control bits for the timer.
+    //     **/
+    //     TCCR1A = 0b10100000;
+    //     TCCR1B = 0b00010001;
+    //     ICR1 = 400;
+    // }
+    // #endif
+
+    #ifdef G2MOTORDRIVER_TIMER3_AVAILABLE
+    Serial.println("Timer 3 Macro Defined");
+    if (_PWMPin == _PWM_TIMER3_PIN_A || _PWMPin == _PWM_TIMER3_PIN_B || _PWMPin == _PWM_TIMER3_PIN_C)
     {
-        /**
-         * Timer 1 Phase-Correct PWM configuration
-         * prescaler: clockI/O / 1
-         * outputs enabled
-         * phase-correct PWM
-         * top of 400
-         * 
-         * PWM frequency calculation
-         * 16MHz / 1 (prescaler) / 2 (phase-correct) / 400 (top) = ~20kHz
-         *
-         * The Timer/Counter Control Registers TCCRnA and TCCRnB hold the main control bits for the timer.
-        **/
-        TCCR1A = 0b10100000;
-        TCCR1B = 0b00010001;
-        ICR1 = 400;
+        TCCR3A = 0b10101000;
+        TCCR3B = 0b00010001;
+        ICR3 = 400;
     }
     #endif
 }
@@ -81,24 +93,43 @@ void G2MotorDriver::setSpeed(int speed)
     if (speed > 400)  // Max PWM dutycycle
         speed = 400;
 
-    #ifdef G2MOTORDRIVER_TIMER1_AVAILABLE
-    if (_PWMPin == _PWM_TIMER1_PIN_A)
+    // #ifdef G2MOTORDRIVER_TIMER1_AVAILABLE
+    // if (_PWMPin == _PWM_TIMER1_PIN_A)
+    // {
+    //     // PWM timer counts from 0 to OCRnA the timer top limit (i.e. value of output compare register A) representing a duty cycle
+    //     OCR1A = speed;
+    // }
+    // else if (_PWMPin == _PWM_TIMER1_PIN_B)
+    // {
+    //     // PWM timer counts from 0 to OCRnB the timer top limit (i.e. value of output compare register B) representing a duty cycle
+    //     OCR1B = speed;
+    // }
+    // else
+    // {
+    //     analogWrite(_PWMPin, speed * 51 / 80); // map 400 to 255
+    // }
+    // // #else
+    // //     analogWrite(_PWMPin, speed * 51 / 80); // map 400 to 255
+    // #endif
+
+   #ifdef G2MOTORDRIVER_TIMER3_AVAILABLE
+    if (_PWMPin == _PWM_TIMER3_PIN_A)
     {
-        // PWM timer counts from 0 to OCRnA the timer top limit (i.e. value of output compare register A) representing a duty cycle
-        OCR1A = speed;
+        OCR3A = speed;
     }
-    else if (_PWMPin == _PWM_TIMER1_PIN_B)
+    else if (_PWMPin == _PWM_TIMER3_PIN_B)
     {
-        // PWM timer counts from 0 to OCRnB the timer top limit (i.e. value of output compare register B) representing a duty cycle
-        OCR1B = speed;
+        OCR3B = speed;
+    }
+    else if (_PWMPin == _PWM_TIMER3_PIN_C)
+    {
+        OCR3C = speed;
     }
     else
     {
-        analogWrite(_PWMPin, speed * 51 / 80); // map 400 to 255
+        analogWrite(_PWMPin, speed * 51 / 80);
     }
-    #else
-        analogWrite(_PWMPin, speed * 51 / 80); // map 400 to 255
-    #endif
+   #endif
 
     if (reverse ^ _flip) // flip if speed was negative or _flip setting is active, but not both
     {
