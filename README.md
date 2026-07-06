@@ -34,8 +34,8 @@ Digital Pins 2, 3, 18, 19, 20, 21 <br>
 Avoid 14 - 19 inclusive as they are UART pins
 
 ### Timers
-Motor1 PWM (2)
-Motor2 PWM (3)
+Motor1 PWM (2) <br>
+Motor2 PWM (3) <br>
 
 Can't use Timer 1, 2
 #### Timer 3
