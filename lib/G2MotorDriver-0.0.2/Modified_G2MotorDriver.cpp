@@ -77,6 +77,26 @@ void G2MotorDriver::init()
         ICR3 = 400;
     }
     #endif
+
+    #ifdef G2MOTORDRIVER_TIMER4_AVAILABLE
+    Serial.println("Timer 4 Macro Defined");
+    if (_PWMPin == _PWM_TIMER4_PIN_A || _PWMPin == _PWM_TIMER4_PIN_B || _PWMPin == _PWM_TIMER4_PIN_C)
+    {
+        TCCR4A = 0b10101000;
+        TCCR4B = 0b00010001;
+        ICR4 = 400;
+    }
+    #endif
+
+    #ifdef G2MOTORDRIVER_TIMER5_AVAILABLE
+    Serial.println("Timer 5 Macro Defined");
+    if (_PWMPin == _PWM_TIMER5_PIN_A || _PWMPin == _PWM_TIMER5_PIN_B || _PWMPin == _PWM_TIMER5_PIN_C)
+    {
+        TCCR5A = 0b10101000;
+        TCCR5B = 0b00010001;
+        ICR5 = 400;
+    }
+    #endif
 }
 
 // Set speed for motor 1, speed is a number betwenn -400 and 400
@@ -125,11 +145,41 @@ void G2MotorDriver::setSpeed(int speed)
     {
         OCR3C = speed;
     }
-    else
-    {
-        analogWrite(_PWMPin, speed * 51 / 80);
-    }
+    // else
+    // {
+    //     analogWrite(_PWMPin, speed * 51 / 80);
+    // }
    #endif
+
+//    #ifdef G2MOTORDRIVER_TIMER4_AVAILABLE
+//     if (_PWMPin == _PWM_TIMER4_PIN_A)
+//     {
+//         OCR4A = speed;
+//     }
+//     else if (_PWMPin == _PWM_TIMER4_PIN_B)
+//     {
+//         OCR4B = speed;
+//     }
+//     else if (_PWMPin == _PWM_TIMER4_PIN_C)
+//     {
+//         OCR4C = speed;
+//     }
+//    #endif
+
+//    #ifdef G2MOTORDRIVER_TIMER5_AVAILABLE
+//     if (_PWMPin == _PWM_TIMER5_PIN_A)
+//     {
+//         OCR5A = speed;
+//     }
+//     else if (_PWMPin == _PWM_TIMER5_PIN_B)
+//     {
+//         OCR5B = speed;
+//     }
+//     else if (_PWMPin == _PWM_TIMER5_PIN_C)
+//     {
+//         OCR5C = speed;
+//     }
+//    #endif
 
     if (reverse ^ _flip) // flip if speed was negative or _flip setting is active, but not both
     {
@@ -173,12 +223,62 @@ void G2MotorDriver::setBrake(int brake)
     {
         analogWrite(_PWMPin, brake * 51 / 80); // map 400 to 255
     }
-    #else
+    // #else
+    // {
+    //     analogWrite(_PWMPin, brake * 51 / 80); // map 400 to 255
+    // }
+    delay(750);
+    #endif
+
+    #ifdef G2MOTORDRIVER_TIMER3_AVAILABLE
+    if (_PWMPin == _PWM_TIMER3_PIN_A)
     {
-        analogWrite(_PWMPin, brake * 51 / 80); // map 400 to 255
+        OCR3A = brake;
+    }
+    else if (_PWMPin == _PWM_TIMER3_PIN_B)
+    {
+        OCR3B = brake;
+    }
+    else if (_PWMPin == _PWM_TIMER3_PIN_C)
+    {
+        OCR3C = brake;
     }
     delay(750);
     #endif
+
+    // #ifdef G2MOTORDRIVER_TIMER4_AVAILABLE
+    // if (_PWMPin == _PWM_TIMER4_PIN_A)
+    // {
+    //     OCR4A = brake;
+    // }
+    // else if (_PWMPin == _PWM_TIMER4_PIN_B)
+    // {
+    //     OCR4B = brake;
+    // }
+    // else if (_PWMPin == _PWM_TIMER4_PIN_C)
+    // {
+    //     OCR4C = brake;
+    // }
+    // delay(750);
+    // #endif
+
+    // #ifdef G2MOTORDRIVER_TIMER5_AVAILABLE
+    // if (_PWMPin == _PWM_TIMER5_PIN_A)
+    // {
+    //     OCR5A = brake;
+    // }
+    // else if (_PWMPin == _PWM_TIMER5_PIN_B)
+    // {
+    //     OCR5B = brake;
+    // }
+    // else if (_PWMPin == _PWM_TIMER5_PIN_C)
+    // {
+    //     OCR5C = brake;
+    // }
+    // delay(750);
+    // #endif
+
+
 }
 
 // Set voltage offset of Motor current reading at 0 speed.

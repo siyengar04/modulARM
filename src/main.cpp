@@ -2,11 +2,11 @@
 
 // Driver config
 // driver 1
-const uint8_t MD_DIR2 = 7; // 5;  //7
-const uint8_t MD_PWM2 = 3; // 12; //2
-const uint8_t MD_SLP2 = 4;
-const uint8_t MD_FLT2 = 30;
-const uint8_t MD_CS2 = A1;
+const uint8_t MD_DIR1 = 7; // 5;  //7
+const uint8_t MD_PWM1 = 3; // 12; //2
+const uint8_t MD_SLP1 = 4;
+const uint8_t MD_FLT1 = 30;
+const uint8_t MD_CS1 = A1;
 
 // driver 2
 const uint8_t MD_DIR2 = 7; // 5;  //7
@@ -42,7 +42,7 @@ const float countsPerMotorRev = 64.0;
 const float countsPerOutputRev = gearRatio * countsPerMotorRev;
 
 // ===================== CONTROL TIMING =====================
-const unsigned long controlPeriodMicros = 2000; // mus = 500 Hz
+const unsigned long controlPeriodMicros = 1000; // mus = 500 Hz
 unsigned long lastControlMicros = 0;
 
 // ===================== PID GAINS =====================
@@ -373,7 +373,7 @@ void keyPress()
 // ===================== MOTOR COMMAND =====================
 void setMotorCommandB(float u)
 {
-  int u_cmd = (int)constrain(u, -150.0, 150.0);
+  int u_cmd = (int)constrain(u, -400.0, 400.0);
   md2.setSpeed(u_cmd);
 }
 
@@ -470,22 +470,13 @@ void setup()
   // Keep motor driver disabled during startup
   md2.setSpeed(0);
   md2.Sleep();
-  // delay(10);
-  // Force command to zero before enabling the driver
-  // delay(10);
   // Now enable the driver
   waitForUserStart();
   md2.Wake();
-  // delay(10);
-  // Calibrate current sensor at zero command
-  // delay(10);
+
 
   lastControlMicros = micros();
 
-  // pinMode(2, OUTPUT);
-  // TCCR3A = 0b10101000;
-  // TCCR3B = 0b00010001;
-  // ICR3 = 400;
 
   Serial.println("Homing motor B...");
 
@@ -505,7 +496,6 @@ void setup()
   Serial.println("Homing complete.");
 
   // 2. Put the driver chip into low-power sleep mode
-  // delay(50);
   md2.Sleep();
   waitForUserStart();
   md2.Wake();
