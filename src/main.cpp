@@ -42,7 +42,7 @@ const float countsPerMotorRev = 64.0;
 const float countsPerOutputRev = gearRatio * countsPerMotorRev;
 
 // ===================== CONTROL TIMING =====================
-const unsigned long controlPeriodMicros = 1000; // mus = 500 Hz
+const unsigned long controlPeriodMicros = 2000; // mus = 500 Hz
 unsigned long lastControlMicros = 0;
 
 // ===================== PID GAINS =====================
