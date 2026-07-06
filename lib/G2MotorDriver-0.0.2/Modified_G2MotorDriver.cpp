@@ -151,35 +151,35 @@ void G2MotorDriver::setSpeed(int speed)
     // }
    #endif
 
-//    #ifdef G2MOTORDRIVER_TIMER4_AVAILABLE
-//     if (_PWMPin == _PWM_TIMER4_PIN_A)
-//     {
-//         OCR4A = speed;
-//     }
-//     else if (_PWMPin == _PWM_TIMER4_PIN_B)
-//     {
-//         OCR4B = speed;
-//     }
-//     else if (_PWMPin == _PWM_TIMER4_PIN_C)
-//     {
-//         OCR4C = speed;
-//     }
-//    #endif
+   #ifdef G2MOTORDRIVER_TIMER4_AVAILABLE
+    if (_PWMPin == _PWM_TIMER4_PIN_A)
+    {
+        OCR4A = speed;
+    }
+    else if (_PWMPin == _PWM_TIMER4_PIN_B)
+    {
+        OCR4B = speed;
+    }
+    else if (_PWMPin == _PWM_TIMER4_PIN_C)
+    {
+        OCR4C = speed;
+    }
+   #endif
 
-//    #ifdef G2MOTORDRIVER_TIMER5_AVAILABLE
-//     if (_PWMPin == _PWM_TIMER5_PIN_A)
-//     {
-//         OCR5A = speed;
-//     }
-//     else if (_PWMPin == _PWM_TIMER5_PIN_B)
-//     {
-//         OCR5B = speed;
-//     }
-//     else if (_PWMPin == _PWM_TIMER5_PIN_C)
-//     {
-//         OCR5C = speed;
-//     }
-//    #endif
+   #ifdef G2MOTORDRIVER_TIMER5_AVAILABLE
+    if (_PWMPin == _PWM_TIMER5_PIN_A)
+    {
+        OCR5A = speed;
+    }
+    else if (_PWMPin == _PWM_TIMER5_PIN_B)
+    {
+        OCR5B = speed;
+    }
+    else if (_PWMPin == _PWM_TIMER5_PIN_C)
+    {
+        OCR5C = speed;
+    }
+   #endif
 
     if (reverse ^ _flip) // flip if speed was negative or _flip setting is active, but not both
     {
@@ -246,37 +246,37 @@ void G2MotorDriver::setBrake(int brake)
     delay(750);
     #endif
 
-    // #ifdef G2MOTORDRIVER_TIMER4_AVAILABLE
-    // if (_PWMPin == _PWM_TIMER4_PIN_A)
-    // {
-    //     OCR4A = brake;
-    // }
-    // else if (_PWMPin == _PWM_TIMER4_PIN_B)
-    // {
-    //     OCR4B = brake;
-    // }
-    // else if (_PWMPin == _PWM_TIMER4_PIN_C)
-    // {
-    //     OCR4C = brake;
-    // }
-    // delay(750);
-    // #endif
+    #ifdef G2MOTORDRIVER_TIMER4_AVAILABLE
+    if (_PWMPin == _PWM_TIMER4_PIN_A)
+    {
+        OCR4A = brake;
+    }
+    else if (_PWMPin == _PWM_TIMER4_PIN_B)
+    {
+        OCR4B = brake;
+    }
+    else if (_PWMPin == _PWM_TIMER4_PIN_C)
+    {
+        OCR4C = brake;
+    }
+    delay(750);
+    #endif
 
-    // #ifdef G2MOTORDRIVER_TIMER5_AVAILABLE
-    // if (_PWMPin == _PWM_TIMER5_PIN_A)
-    // {
-    //     OCR5A = brake;
-    // }
-    // else if (_PWMPin == _PWM_TIMER5_PIN_B)
-    // {
-    //     OCR5B = brake;
-    // }
-    // else if (_PWMPin == _PWM_TIMER5_PIN_C)
-    // {
-    //     OCR5C = brake;
-    // }
-    // delay(750);
-    // #endif
+    #ifdef G2MOTORDRIVER_TIMER5_AVAILABLE
+    if (_PWMPin == _PWM_TIMER5_PIN_A)
+    {
+        OCR5A = brake;
+    }
+    else if (_PWMPin == _PWM_TIMER5_PIN_B)
+    {
+        OCR5B = brake;
+    }
+    else if (_PWMPin == _PWM_TIMER5_PIN_C)
+    {
+        OCR5C = brake;
+    }
+    delay(750);
+    #endif
 
 
 }
