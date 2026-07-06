@@ -39,34 +39,34 @@ Motor2 PWM (3)
 
 Can't use Timer 1, 2
 #### Timer 3
-3A: 5 (Motor1 PWM)
+3A: 5 (Motor1 PWM)<br> 
 3B: 2 
 3C: 3 
 
 #### Timer 4
-4A: 6 (Motor2 PWM)
-4B: 7 
-4C: 8
+4A: 6 (Motor2 PWM) <br>
+4B: 7  <br>
+4C: 8 <br>
 
 
 ### Digital Pins
-Motor1 DIR (22)
-Motor2 DIR (23)
+Motor1 DIR (22) <br>
+Motor2 DIR (23) 
 
 ## Teensy 4.1 Documentation
 https://www.pjrc.com/store/teensy41.html 
 
 ### Motors
 #### Motor 1
-Motor1 DIR: 22
-Motor1 PWM: 5
-Encoder1 A: 2
-Encoder1 B: 3
-Limit1 B: 20
+Motor1 DIR: 22 <br>
+Motor1 PWM: 5 <br> 
+Encoder1 A: 2 <br>
+Encoder1 B: 3 <br>
+Limit1 B: 20 <br>
 
 #### Motor 2:
-Motor2 DIR: 23
-Motor2 PWM: 6
-Encoder2 A: 18
-Encoder2 B: 19
+Motor2 DIR: 23 <br>
+Motor2 PWM: 6 <br>
+Encoder2 A: 18 <br>
+Encoder2 B: 19 <br>
 Limit2 B: 21
