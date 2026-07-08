@@ -16,10 +16,10 @@ const uint8_t MD_FLT2 = 30;
 const uint8_t MD_CS2 = A1;
 
 // Limit switch pins
-// const uint8_t limitSwitchPin1A = ;
+const uint8_t limitSwitchPin1A = 8;
 const uint8_t limitSwitchPin1B = 21;
 const uint8_t limitSwitchPin2B = 20;
-const uint8_t limitSwitchPin2A = 8;
+const uint8_t limitSwitchPin2A = 9;
 
 const float maxTheta2 = 2.62;
 const float home2 = 0.26;
@@ -57,7 +57,7 @@ float Ki1 = 200.0; // 300
 float Kd1 = .1;    // 2
 
 // motor 2
-float Kp2 = 700.0; // 500
+float Kp2 = 900.0; // 500
 float Ki2 = 200.0; // 300
 float Kd2 = .1;    // 2
 
@@ -145,9 +145,12 @@ void doEncoder2B()
 
 void doLimit1()
  {
+  if (omega_measA < 0)
+  {
   md1.setSpeed(0);
   md2.setSpeed(0);
   systemLock = true;
+  }
  }
 
 void doLimit2()
@@ -348,6 +351,8 @@ void keyPress()
 
     // Prints array with state positions for visual confirmation
     Serial.println("All states are the following: ");
+
+    Serial.println("Motor 1 : [");
     for (int i = 0; i < num_of_pos - 1; i++)
     {
       Serial.print(thetaDes1[i]);
@@ -442,14 +447,14 @@ void keyPress()
 void setMotorCommandA(float u)
 {
   // -400 dont work
-  int u_cmd = (int)constrain(u, -350.0, 350.0);
+  int u_cmd = (int)constrain(u, -100.0, 100.0);
   md1.setSpeed(u_cmd);
 }
 
 void setMotorCommandB(float u)
 {
   // -400 dont work
-  int u_cmd = (int)constrain(u, -350.0, 350.0);
+  int u_cmd = (int)constrain(u, -100.0, 100.0);
   md2.setSpeed(u_cmd);
 }
 
@@ -495,11 +500,11 @@ float calculatePID(float thetaDes2, float theta_meas, float maxTheta, float dt, 
     e_int = constrain(e_int, -eIntMax, eIntMax);
   }
 
-  if (digitalRead(limitSwitchPin2A) == LOW)
-  {
-    systemLock = true;
-    return 0;
-  }
+  // if (digitalRead(limitSwitchPin2A) == LOW)
+  // {
+  //   systemLock = true;
+  //   return 0;
+  // }
 
   // Boundary check
   if (((theta_meas >= maxTheta) && u_sat > 0) || (theta_meas <= 0.05 && u_sat < 0))
@@ -567,8 +572,8 @@ void setup()
   } while (digitalRead(limitSwitchPin1B) == HIGH);
 
   md1.setSpeed(0);
-  encoderCountA = 0;
-  theta_measA = 0.0; // Set current position as zero reference
+  encoderCountA = 715;
+  theta_measA = 0.26; // Set current position as zero reference
   e_int1 = 0.0;
   e_prev1 = 0.0;
 
@@ -582,8 +587,8 @@ void setup()
 
   // Initializes values after homing
   md2.setSpeed(0);
-  encoderCountB = 0;
-  theta_measB = 0.0;
+  encoderCountB = 715;
+  theta_measB = 0.26;
   e_int2 = 0.0;
   e_prev2 = 0.0;
   calibrated = true;
@@ -619,7 +624,14 @@ void loop()
     md2.setSpeed(0);
     md1.Sleep();
     md2.Sleep();
+    if (systemLock)
+    {
     Serial.println("Limit switch hit! Halting.");
+    }
+    else
+    {
+      Serial.println("Limit Switch 2 hit! Halting");
+    }
     while (true)
     {
     }
