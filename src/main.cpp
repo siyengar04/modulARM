@@ -22,6 +22,7 @@ const uint8_t limitSwitchPin2B = 20;
 const uint8_t limitSwitchPin2A = 9;
 
 const float maxTheta2 = 2.62;
+const int maxVel = 75;
 const float home2 = 0.26;
 
 volatile bool calibrated = false;
@@ -59,14 +60,15 @@ float Kd1 = .1;    // 2
 // motor 2
 float Kp2 = 900.0; // 500
 float Ki2 = 200.0; // 300
-float Kd2 = .1;    // 2
+float Kd2 = .25;    // 2
 
 // ===================== SETPOINT =====================
-// float thetaDes2B = PI;
-
 const int MAX_STATES = 10; // max allowed number of states
 float thetaDes1[MAX_STATES];
 float thetaDes2[MAX_STATES];
+
+float omegaDes1[MAX_STATES];
+float omegaDes2[MAX_STATES];
 int num_of_pos = 1; // Desired number of states
 
 int completed = 0; // Tracks current state
@@ -188,8 +190,34 @@ void set_thetaDes(float &thetaDes, float maxTheta, int pos)
   Serial.print("Target position for state ");
   Serial.print(pos);
   Serial.print(" successfully set to: ");
-  Serial.print("Target position successfully set to: "); // comment out when switching to array
   Serial.println(thetaDes, 4);
+
+  return;
+}
+
+void set_omegaDes(float &omegaDes, int pos)
+{
+  // Prompt User for desired position
+  Serial.println("==============================================");
+  Serial.print("Enter desired velocity (0 to ");
+  Serial.print(maxVel);
+  Serial.print(") ");
+  Serial.print("for position ");
+  Serial.print(pos);
+  Serial.println(":");
+  Serial.println("==============================================");
+
+  // Reads user input (float)
+  Serial.setTimeout(10000);
+  float new_omega = Serial.parseFloat();
+
+  omegaDes = constrain(new_omega, 0, maxVel);
+
+  // Print confirmation
+  Serial.print("Target velocity for state ");
+  Serial.print(pos);
+  Serial.print(" successfully set to: ");
+  Serial.println(omegaDes, 4);
 
   return;
 }
@@ -233,11 +261,18 @@ void waitForUserStart()
             set_thetaDes(thetaDes2[i], maxTheta2, i);
           }
 
+          for (int i = 0; i < num_of_pos; i++)
+          {
+            set_omegaDes(omegaDes1[i], i);
+            set_omegaDes(omegaDes2[i], i);
+          }
+
           completed = 0;
 
           // Prints an array with all of the states for visual confirmation
           Serial.println("All states are the following: ");
-          Serial.print("Motor 1 : [");
+          Serial.println("Motor 1 : ");
+          Serial.print("Position : [");
           for (int i = 0; i < num_of_pos - 1; i++)
           {
             Serial.print(thetaDes1[i]);
@@ -246,13 +281,32 @@ void waitForUserStart()
           Serial.print(thetaDes1[num_of_pos - 1]);
           Serial.println("]");
 
-          Serial.print("Motor 2 : [");
+          Serial.print("Speed : [");
+          for (int i = 0; i < num_of_pos - 1; i++)
+          {
+            Serial.print(omegaDes1[i]);
+            Serial.print(", ");
+          }
+          Serial.print(omegaDes1[num_of_pos - 1]);
+          Serial.println("]");
+
+          Serial.println("Motor 2 :");
+          Serial.print("Position : [");
           for (int i = 0; i < num_of_pos - 1; i++)
           {
             Serial.print(thetaDes2[i]);
             Serial.print(", ");
           }
           Serial.print(thetaDes2[num_of_pos - 1]);
+          Serial.println("]");
+
+          Serial.print("Speed : [");
+          for (int i = 0; i < num_of_pos - 1; i++)
+          {
+            Serial.print(omegaDes2[i]);
+            Serial.print(", ");
+          }
+          Serial.print(omegaDes2[num_of_pos - 1]);
           Serial.println("]");
 
           // Waits for user to actually start the program
@@ -346,13 +400,19 @@ void keyPress()
       set_thetaDes(thetaDes2[i], maxTheta2, i);
     }
 
+    for (int i = 0; i < num_of_pos; i++)
+    {
+      set_omegaDes(omegaDes1[i], i);
+      set_omegaDes(omegaDes2[i], i);
+    }
+
     // Reset to do proper counting of current state
     completed = 0;
 
     // Prints array with state positions for visual confirmation
     Serial.println("All states are the following: ");
-
-    Serial.println("Motor 1 : [");
+    Serial.println("Motor 1 : ");
+    Serial.print("Position : [");
     for (int i = 0; i < num_of_pos - 1; i++)
     {
       Serial.print(thetaDes1[i]);
@@ -361,13 +421,32 @@ void keyPress()
     Serial.print(thetaDes1[num_of_pos - 1]);
     Serial.println("]");
 
-    Serial.print("Motor 2 : [");
+    Serial.print("Speed : [");
+    for (int i = 0; i < num_of_pos - 1; i++)
+    {
+      Serial.print(omegaDes1[i]);
+      Serial.print(", ");
+    }
+    Serial.print(omegaDes1[num_of_pos - 1]);
+    Serial.println("]");
+
+    Serial.println("Motor 2 :");
+    Serial.print("Position : [");
     for (int i = 0; i < num_of_pos - 1; i++)
     {
       Serial.print(thetaDes2[i]);
       Serial.print(", ");
     }
     Serial.print(thetaDes2[num_of_pos - 1]);
+    Serial.println("]");
+
+    Serial.print("Speed : [");
+    for (int i = 0; i < num_of_pos - 1; i++)
+    {
+      Serial.print(omegaDes2[i]);
+      Serial.print(", ");
+    }
+    Serial.print(omegaDes2[num_of_pos - 1]);
     Serial.println("]");
 
     // Require user input to start the program again
@@ -416,7 +495,7 @@ void keyPress()
     readEncoderState(dt_pre, encoderCountB, prevCountB, theta_measB, omega_measB);
 
     // Prevents sudden jerking movement I think (may not be necessary)
-    e_prev1 = thetaDes1[0] = theta_measA;
+    e_prev1 = thetaDes1[0] - theta_measA;
     e_prev2 = thetaDes2[0] - theta_measB;
 
     md1.Wake();
@@ -447,14 +526,14 @@ void keyPress()
 void setMotorCommandA(float u)
 {
   // -400 dont work
-  int u_cmd = (int)constrain(u, -100.0, 100.0);
+  int u_cmd = (int)constrain(u, -75.0, 75.0);
   md1.setSpeed(u_cmd);
 }
 
 void setMotorCommandB(float u)
 {
   // -400 dont work
-  int u_cmd = (int)constrain(u, -100.0, 100.0);
+  int u_cmd = (int)constrain(u, -75.0, 75.0);
   md2.setSpeed(u_cmd);
 }
 
@@ -476,7 +555,7 @@ void readEncoderState(float dt, volatile long encoderCount, long &prevCount, flo
 }
 
 // ==================== PID Function ========================= Made separate for ease of use between motors
-float calculatePID(float thetaDes2, float theta_meas, float maxTheta, float dt, float &e_int, float &e_prev, float Kp, float Ki, float Kd)
+float calculatePID(float thetaDes2, float theta_meas, float omegaDes, float omega_meas, float maxTheta, float dt, float &e_int, float &e_prev, float Kp, float Ki, float Kd)
 {
   // Position error
   float e = thetaDes2 - theta_meas;
@@ -485,7 +564,7 @@ float calculatePID(float thetaDes2, float theta_meas, float maxTheta, float dt, 
   e_int = constrain(e_int, -eIntMax, eIntMax);
 
   // Derivative term:
-  float e_dot = (e - e_prev) / dt;
+  float e_dot = omegaDes - omega_meas; //(e - e_prev) / dt;
   e_prev = e;
 
   float u = Kp * e + Ki * e_int + Kd * e_dot;
@@ -500,14 +579,14 @@ float calculatePID(float thetaDes2, float theta_meas, float maxTheta, float dt, 
     e_int = constrain(e_int, -eIntMax, eIntMax);
   }
 
-  // if (digitalRead(limitSwitchPin2A) == LOW)
+  // if (digitalRead(limitSwitchPin2A) == LOW || digitalRead(limitSwitchPin1A == LOW))
   // {
   //   systemLock = true;
   //   return 0;
   // }
 
   // Boundary check
-  if (((theta_meas >= maxTheta) && u_sat > 0) || (theta_meas <= 0.05 && u_sat < 0))
+  if (((theta_meas >= maxTheta) && u_sat > 0) || (theta_meas <= home2 && u_sat < 0))
   {
     return 0;
   }
@@ -541,6 +620,9 @@ void setup()
   // Sets default PID thetaDes2 to PI if something goes wrong with user input
   thetaDes1[0] = PI;
   thetaDes2[0] = PI;
+
+  omegaDes1[0] = 50.0;
+  omegaDes2[0] = 50.0;
 
   md1.init();
   md1.calibrateCurrentOffset();
@@ -673,6 +755,15 @@ void loop()
         e_prev1 = thetaDes1[completed] - theta_measA;
         e_prev2 = thetaDes2[completed] - theta_measB;
 
+        if ((omegaDes1[completed] < 0 && thetaDes1[completed] > theta_measA) || (omegaDes1[completed] > 0 && thetaDes1[completed] < theta_measA))
+        {
+          omegaDes1[completed] = -omegaDes1[completed];
+        }
+
+        if ((omegaDes2[completed] < 0 && thetaDes2[completed] > theta_measB) || (omegaDes2[completed] > 0 && thetaDes2[completed] < theta_measB))
+        {
+          omegaDes2[completed] = -omegaDes2[completed];
+        }
         // Tells user about delay and delay progress
         for (int i = 0; i < wait; i++)
         {
@@ -685,8 +776,8 @@ void loop()
     }
 
     // Calculate PID and control motor
-    float u_satA = calculatePID(thetaDes1[completed], theta_measA, maxTheta2, dt, e_int1, e_prev1, Kp1, Ki1, Kd1);
-    float u_satB = calculatePID(thetaDes2[completed], theta_measB, maxTheta2, dt, e_int2, e_prev2, Kp2, Ki2, Kd2);
+    float u_satA = calculatePID(thetaDes1[completed], theta_measA, omegaDes1[completed], omega_measA, maxTheta2, dt, e_int1, e_prev1, Kp1, Ki1, Kd1);
+    float u_satB = calculatePID(thetaDes2[completed], theta_measB, omegaDes2[completed], omega_measB, maxTheta2, dt, e_int2, e_prev2, Kp2, Ki2, Kd2);
     setMotorCommandA(u_satA);
     setMotorCommandB(u_satB);
 
