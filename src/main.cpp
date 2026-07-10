@@ -22,7 +22,7 @@ const uint8_t limitSwitchPin2B = 20;
 const uint8_t limitSwitchPin2A = 9;
 
 const float maxTheta2 = 2.62;
-const int maxVel = 75;
+const int maxVel = 2;   // rad/s
 const float home2 = 0.26;
 
 volatile bool calibrated = false;
@@ -53,14 +53,16 @@ unsigned long lastControlMicros = 0;
 
 // ===================== PID GAINS =====================
 // motor 1
-float Kp1 = 700.0; // 500
-float Ki1 = 200.0; // 300
-float Kd1 = .1;    // 2
+float Kp1 = 100.0; // 700
+float Ki1 = 50.0; // 200
+float Kd1 = 0.1;    // .1
+
+float Kv = 20;    //feedforward velocity gain
 
 // motor 2
-float Kp2 = 900.0; // 500
-float Ki2 = 200.0; // 300
-float Kd2 = .25;    // 2
+float Kp2 = 100.0; // 900
+float Ki2 = 50.0; // 200
+float Kd2 = 0.25;    // .25
 
 // ===================== SETPOINT =====================
 const int MAX_STATES = 10; // max allowed number of states
@@ -486,6 +488,16 @@ void keyPress()
     e_int1 = 0.0;
     e_int2 = 0.0;
 
+    if ((omegaDes1[completed] < 0 && thetaDes1[completed] > theta_measA) || (omegaDes1[completed] > 0 && thetaDes1[completed] < theta_measA))
+    {
+      omegaDes1[completed] = -omegaDes1[completed];
+    }
+
+    if ((omegaDes2[completed] < 0 && thetaDes2[completed] > theta_measB) || (omegaDes2[completed] > 0 && thetaDes2[completed] < theta_measB))
+    {
+      omegaDes2[completed] = -omegaDes2[completed];
+    }
+
     // Read encoder to setup for new state
     unsigned long now_pre = micros();
     float dt_pre = (now_pre - lastControlMicros) * 1e-6;
@@ -495,8 +507,8 @@ void keyPress()
     readEncoderState(dt_pre, encoderCountB, prevCountB, theta_measB, omega_measB);
 
     // Prevents sudden jerking movement I think (may not be necessary)
-    e_prev1 = thetaDes1[0] - theta_measA;
-    e_prev2 = thetaDes2[0] - theta_measB;
+    // e_prev1 = thetaDes1[0] - theta_measA;
+    // e_prev2 = thetaDes2[0] - theta_measB;
 
     md1.Wake();
     md2.Wake();
@@ -526,14 +538,14 @@ void keyPress()
 void setMotorCommandA(float u)
 {
   // -400 dont work
-  int u_cmd = (int)constrain(u, -75.0, 75.0);
+  int u_cmd = (int)constrain(u, -350, 350);
   md1.setSpeed(u_cmd);
 }
 
 void setMotorCommandB(float u)
 {
   // -400 dont work
-  int u_cmd = (int)constrain(u, -75.0, 75.0);
+  int u_cmd = (int)constrain(u, -350, 350);
   md2.setSpeed(u_cmd);
 }
 
@@ -567,10 +579,10 @@ float calculatePID(float thetaDes2, float theta_meas, float omegaDes, float omeg
   float e_dot = omegaDes - omega_meas; //(e - e_prev) / dt;
   e_prev = e;
 
-  float u = Kp * e + Ki * e_int + Kd * e_dot;
+  float u = Kp * e + Ki * e_int + Kd * e_dot + Kv * omegaDes;
 
   // Saturate command
-  float u_sat = constrain(u, -400.0, 400.0);
+  float u_sat = constrain(u, -350, 350);
 
   // Extra anti-windup: stop integrating if saturated in the same direction
   if ((u != u_sat) && ((e > 0 && u > 0) || (e < 0 && u < 0)))
@@ -648,10 +660,10 @@ void setup()
   Serial.println("Homing motor A...");
 
   // Homing loop
-  do
-  {
-    md1.setSpeed(-50);
-  } while (digitalRead(limitSwitchPin1B) == HIGH);
+  // do
+  // {
+  //   md1.setSpeed(-50);
+  // } while (digitalRead(limitSwitchPin1B) == HIGH);
 
   md1.setSpeed(0);
   encoderCountA = 715;
@@ -662,10 +674,10 @@ void setup()
   Serial.println("Homing motor B...");
 
   // Homing loop
-  do
-  {
-    md2.setSpeed(-50);
-  } while (digitalRead(limitSwitchPin2B) == HIGH);
+  // do
+  // {
+  //   md2.setSpeed(-50);
+  // } while (digitalRead(limitSwitchPin2B) == HIGH);
 
   // Initializes values after homing
   md2.setSpeed(0);
